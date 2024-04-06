@@ -1,13 +1,14 @@
 package util;
 
-import com.mint.db.impl.BaseEntry;
 import com.mint.db.Entry;
+import com.mint.db.impl.BaseEntry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.opentest4j.AssertionFailedError;
 
 import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -20,6 +21,44 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class BaseTest {
 
     private final CopyOnWriteArrayList<ExecutorService> executors = new CopyOnWriteArrayList<>();
+
+    public static void sleep(final int millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static void retry(Runnable runnable) {
+        while (true) {
+            try {
+                runnable.run();
+                break;
+            } catch (Exception e) {
+                sleep(100);
+            }
+        }
+    }
+
+    public void assertEmpty(Iterator<?> iterator) {
+        checkInterrupted();
+        Assertions.assertIterableEquals(Collections.emptyList(), list(iterator));
+    }
+
+    public void assertSame(Entry<String> entry, Entry<String> expected) {
+        checkInterrupted();
+        Assertions.assertEquals(expected, entry);
+    }
+
+    public void assertNull(Entry<String> entry) {
+        checkInterrupted();
+        Assertions.assertNull(entry);
+    }
+
+    public void assertSame(Iterator<? extends Entry<String>> iterator, Entry<?>... expected) {
+        assertSame(iterator, Arrays.asList(expected));
+    }
 
     public void assertSame(Iterator<? extends Entry<String>> iterator, List<? extends Entry<?>> expected) {
         int index = 0;
@@ -49,6 +88,15 @@ public class BaseTest {
         throw new AssertionFailedError(entry + " not found in iterator with elements count " + count);
     }
 
+    public Entry<String> entry(String key, String value) {
+        checkInterrupted();
+        return new BaseEntry<>(key, value);
+    }
+
+    public List<Entry<String>> entries(int count) {
+        return entries("k", "v", count);
+    }
+
     public List<Entry<String>> entries(String keyPrefix, String valuePrefix, int count) {
         return new AbstractList<>() {
             @Override
@@ -66,6 +114,28 @@ public class BaseTest {
                 return count;
             }
         };
+    }
+
+    public Entry<String> entryAt(int index) {
+        return new BaseEntry<>(keyAt(index), valueAt(index));
+    }
+
+    public String keyAt(int index) {
+        return keyAt("k", index);
+    }
+
+    public String valueAt(int index) {
+        return valueAt("v", index);
+    }
+
+    public String keyAt(String prefix, int index) {
+        String paddedIdx = String.format("%010d", index);
+        return prefix + paddedIdx;
+    }
+
+    public String valueAt(String prefix, int index) {
+        String paddedIdx = String.format("%010d", index);
+        return prefix + paddedIdx;
     }
 
     public <T> List<T> list(Iterator<T> iterator) {

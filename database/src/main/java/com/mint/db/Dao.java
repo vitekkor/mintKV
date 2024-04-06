@@ -7,7 +7,7 @@ public interface Dao<D, E extends Entry<D>> {
 
     Iterator<E> get(D from, D to);
 
-    void put(E entry);
+    void upsert(E entry);
 
     default Iterator<E> all() {
         return get(null, null);

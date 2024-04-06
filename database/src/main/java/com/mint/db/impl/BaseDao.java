@@ -19,7 +19,7 @@ public class BaseDao implements Dao<MemorySegment, Entry<MemorySegment>> {
     }
 
     @Override
-    public void put(Entry<MemorySegment> entry) {
+    public void upsert(Entry<MemorySegment> entry) {
         delegate.put(entry.key(), entry);
     }
 

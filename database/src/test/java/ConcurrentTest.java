@@ -7,14 +7,14 @@ import util.BaseTest;
 import java.util.List;
 
 
-public class ConcurrentTest extends BaseTest {
-    StringDaoWrapper dao = new StringDaoWrapper();
+class ConcurrentTest extends BaseTest {
+    private final StringDaoWrapper dao = new StringDaoWrapper();
 
     @Test
     void test_10_000() throws Exception {
         int count = 10_000;
         List<Entry<String>> entries = entries("k", "v", count);
-        runInParallel(4, count, value -> dao.put(entries.get(value))).close();
+        runInParallel(4, count, value -> dao.upsert(entries.get(value))).close();
         assertSame(dao.all(), entries);
     }
 
@@ -25,7 +25,7 @@ public class ConcurrentTest extends BaseTest {
         int count = 2_500;
         List<Entry<String>> entries = entries("k", "v", count);
         runInParallel(4, count, value -> {
-            dao.put(entries.get(value));
+            dao.upsert(entries.get(value));
             assertContains(dao.all(), entries.get(value));
         }).close();
 
@@ -37,7 +37,7 @@ public class ConcurrentTest extends BaseTest {
         int count = 8_000;
         List<Entry<String>> entries = entries("k", "v", count);
         for (Entry<String> entry : entries) {
-            dao.put(entry);
+            dao.upsert(entry);
         }
         runInParallel(4, count, value -> assertContains(dao.all(), entries.get(value))).close();
 

@@ -58,7 +58,7 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
     }
 
     @Override
-    public void put(Entry<String> entry) {
-        delegate.put(new BaseEntry<>(toMemorySegment(entry.key()), toMemorySegment(entry.value())));
+    public void upsert(Entry<String> entry) {
+        delegate.upsert(new BaseEntry<>(toMemorySegment(entry.key()), toMemorySegment(entry.value())));
     }
 }
