@@ -12,12 +12,4 @@ public interface Dao<D, E extends Entry<D>> {
     default Iterator<E> all() {
         return get(null, null);
     }
-
-    default Iterator<E> allFrom(D from) {
-        return get(from, null);
-    }
-
-    default Iterator<E> allTo(D to) {
-        return get(null, to);
-    }
 }

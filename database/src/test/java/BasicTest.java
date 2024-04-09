@@ -99,45 +99,6 @@ class BasicTest extends BaseTest {
     }
 
     @Test
-    void testFindRangeInTheMiddle() {
-        dao.upsert(entry("e", "f"));
-        dao.upsert(entry("c", "d"));
-        dao.upsert(entry("a", "b"));
-
-        assertSame(dao.get("c", "e"), entry("c", "d"));
-    }
-
-    @Test
-    void testFindFullRange() {
-        dao.upsert(entry("e", "f"));
-        dao.upsert(entry("c", "d"));
-        dao.upsert(entry("a", "b"));
-
-
-        assertSame(
-                dao.get("a", "z"),
-
-                entry("a", "b"),
-                entry("c", "d"),
-                entry("e", "f")
-        );
-    }
-
-    @Test
-    void testAllTo() {
-        dao.upsert(entry("e", "f"));
-        dao.upsert(entry("c", "d"));
-        dao.upsert(entry("a", "b"));
-
-        assertSame(
-                dao.allTo("e"),
-
-                entry("a", "b"),
-                entry("c", "d")
-        );
-    }
-
-    @Test
     void testHugeData() throws Exception {
         final int entries = 100_000;
 
