@@ -27,15 +27,13 @@ jobs:
     - name: Build with Gradle Wrapper
       run: ./gradlew build
 
-  formatting:
+  checkstyle:
 
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-      - uses: axel-op/googlejavaformat-action@v3
+      - uses: dbelyaev/action-checkstyle@master
         with:
-          args: "--replace"
-          skip-commit: true
-      - name: Print diffs
-        run: git --no-pager diff --exit-code
+          github_token: ${{ secrets.github_token }}
+          reporter: github-pr-review
+          checkstyle_config: sun_checks.xml
