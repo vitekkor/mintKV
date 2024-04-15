@@ -35,5 +35,6 @@ jobs:
       - uses: dbelyaev/action-checkstyle@master
         with:
           github_token: ${{ secrets.github_token }}
-          reporter: github-pr-review
+          reporter: github-check
           checkstyle_config: sun_checks.xml
+          level: error
