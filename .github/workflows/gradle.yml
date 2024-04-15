@@ -28,7 +28,7 @@ jobs:
       run: ./gradlew build
 
   checkstyle:
-
+    name: checkstyle
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -37,5 +37,6 @@ jobs:
           github_token: ${{ secrets.github_token }}
           reporter: github-pr-review
           checkstyle_config: google_checks.xml
+          filter_mode: file
           level: warning
           fail_on_error: true
