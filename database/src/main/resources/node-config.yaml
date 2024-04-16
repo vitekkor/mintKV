@@ -1,0 +1,7 @@
+server:
+  port: 8080
+  node-id: 0
+  cluster:
+    - http://localhost:8081
+    - http://localhost:8082
+    - http://localhost:8083
