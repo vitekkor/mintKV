@@ -2,10 +2,8 @@ package com.mint.db.config;
 
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
-import org.yaml.snakeyaml.constructor.BaseConstructor;
 import org.yaml.snakeyaml.constructor.Constructor;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Objects;
 
@@ -18,7 +16,7 @@ public final class ConfigParser {
 
     }
 
-    public static NodeConfig parseConfig() throws IOException {
+    public static NodeConfig parseConfig() {
         String configPath = System.getProperty(NODE_CONFIG_ENV_PROPERTY);
 
         InputStream inputStream = ConfigParser.class
