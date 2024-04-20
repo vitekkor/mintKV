@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package database;
+
+enum ReadMode {
+  READ_COMMITTED = 0;
+  READ_LOCAL = 1;
+  READ_CONSENSUS = 2;
+}
+
+message InsertRequest {
+  string key = 1;
+  string value = 2;
+  bool uncommitted = 3;
+}
+
+message DeleteRequest {
+  string key = 1;
+  bool uncommitted = 3;
+}
+
+message GetRequest {
+  bytes key = 1;
+  ReadMode mode = 2;
+}
+
+message GetResponse {
+  bytes value = 1;
+  bool found = 2;
+}
+
+message SuccessfulWriteResponse {
+}
+
+service DatabaseService {
+  rpc Insert(InsertRequest) returns (SuccessfulWriteResponse);
+  rpc Delete(DeleteRequest) returns (SuccessfulWriteResponse);
+  rpc Get(GetRequest) returns (GetResponse);
+}
