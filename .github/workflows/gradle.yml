@@ -39,7 +39,7 @@ jobs:
         with:
           github_token: ${{ secrets.github_token }}
           reporter: github-pr-review
-          checkstyle_config: google_checks.xml
+          checkstyle_config: ./.github/workflows/checks.xml
           filter_mode: file
           level: warning
           fail_on_error: true
