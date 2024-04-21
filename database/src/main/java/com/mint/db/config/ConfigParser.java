@@ -4,8 +4,10 @@ import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
 import org.yaml.snakeyaml.constructor.Constructor;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.InputStream;
-import java.util.Objects;
 
 public final class ConfigParser {
     private static final String NODE_CONFIG_PATH_DEFAULT = "node-config.yaml";
@@ -16,17 +18,24 @@ public final class ConfigParser {
 
     }
 
-    public static NodeConfig parseConfig() {
+    public static NodeConfig parseConfig() throws FileNotFoundException {
         String configPath = System.getProperty(NODE_CONFIG_ENV_PROPERTY);
 
-        InputStream inputStream = ConfigParser.class
-                .getClassLoader()
-                .getResourceAsStream(
-                        Objects.requireNonNullElse(configPath, NODE_CONFIG_PATH_DEFAULT)
-                );
+        InputStream inputStream;
+        if (configPath != null) {
+            inputStream = getConfigInputStream(configPath);
+        } else {
+            inputStream = ConfigParser.class.getClassLoader().getResourceAsStream(NODE_CONFIG_PATH_DEFAULT);
+        }
 
         NodeConfig nodeConfig = YAML.load(inputStream);
 
         return nodeConfig;
     }
+
+    public static InputStream getConfigInputStream(String configPath) throws FileNotFoundException {
+        File configFile = new File(configPath);
+        return new FileInputStream(configFile);
+    }
+
 }
