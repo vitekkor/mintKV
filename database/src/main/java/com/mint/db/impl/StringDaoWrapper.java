@@ -15,14 +15,14 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
         this.delegate = new BaseDao();
     }
 
-    private static String toString(MemorySegment memorySegment) {
+    public static String toString(MemorySegment memorySegment) {
         if (memorySegment == null) {
             return null;
         }
         return new String(memorySegment.toArray(ValueLayout.JAVA_BYTE), StandardCharsets.UTF_8);
     }
 
-    private static MemorySegment toMemorySegment(String string) {
+    public static MemorySegment toMemorySegment(String string) {
         if (string == null) {
             return null;
         }
