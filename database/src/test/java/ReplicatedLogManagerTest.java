@@ -52,9 +52,12 @@ public class ReplicatedLogManagerTest {
             offset += Long.BYTES;
             byte[] value = new byte[(int) valueSize];
             buffer.get(offset, value, 0, (int) valueSize);
+            offset += valueSize;
+            long timestamp = buffer.getLong(offset);
             assertEquals(OperationType.PUT.getValue(), operationType);
             assertEquals("key", StringDaoWrapper.toString(MemorySegment.ofArray(key)));
             assertEquals("value", StringDaoWrapper.toString(MemorySegment.ofArray(value)));
+            assertEquals(logEntry.timestamp(), timestamp);
         }
     }
 
