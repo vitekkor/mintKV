@@ -1,4 +1,4 @@
-package com.mint.db;
+package com.mint.db.replication.model.impl;
 
 public enum OperationType {
     GET(0), PUT(1), DELETE(2);
