@@ -16,14 +16,12 @@ public class RaftActor {
     private static final Random rand = new Random();
     private static final int POOL_SIZE = 1;
     private final ScheduledExecutorService scheduledExecutor;
-    private final Runnable heartBeatTask;
     private ScheduledFuture<?> scheduledFuture;
     private static final long HEARTBEAT_DELAY_MS = 5000L;
     private boolean amILeader = false; // ?
 
     public RaftActor() {
         this.scheduledExecutor = Executors.newScheduledThreadPool(POOL_SIZE);
-        this.heartBeatTask = () -> System.out.println("STUB");
     }
 
     private void sleepBeforeElections() {
@@ -32,11 +30,15 @@ public class RaftActor {
         }
 
         scheduledFuture = scheduledExecutor.scheduleAtFixedRate(
-                heartBeatTask,
+                this::onHeartBeatNotReceived,
                 HEARTBEAT_DELAY_MS,
                 HEARTBEAT_DELAY_MS + rand.nextLong(1000L, 5000L),
                 TimeUnit.MILLISECONDS);
 
+    }
+
+    private void onHeartBeatNotReceived() {
+        System.out.println("STUB");
     }
 
     public void onHeartBeat() throws StatusException {
