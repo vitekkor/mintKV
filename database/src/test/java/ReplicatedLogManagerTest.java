@@ -105,16 +105,20 @@ public class ReplicatedLogManagerTest {
         return deserializeLogEntries(fileChannel, logFile).getFirst();
     }
 
-    private List<LogEntry<MemorySegment>> deserializeLogEntries(FileChannel fileChannel, Path logFile) throws IOException {
+    private List<LogEntry<MemorySegment>> deserializeLogEntries(
+            FileChannel fileChannel, Path logFile) throws IOException {
         List<LogEntry<MemorySegment>> logEntries = new ArrayList<>();
         int offset = 0;
         while (offset < Files.size(logFile)) {
-            MemorySegment ms = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, Files.size(logFile), Arena.ofAuto());
-            long operationType = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
+            MemorySegment ms = fileChannel.map(
+                    FileChannel.MapMode.READ_ONLY,
+                    0,
+                    Files.size(logFile),
+                    Arena.ofAuto()
+            );
             offset += Long.BYTES;
             long keySize = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
             offset += Long.BYTES;
-            MemorySegment key = ms.asSlice(offset, keySize);
             offset += keySize;
             long valueSize = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
             MemorySegment value = null;
@@ -127,12 +131,15 @@ public class ReplicatedLogManagerTest {
             }
             long timestamp = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
             offset += Long.BYTES;
+            MemorySegment key = ms.asSlice(offset, keySize);
+            long operationType = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
             logEntries.add(createLogEntry(operationType, key, value, timestamp));
         }
         return logEntries;
     }
 
-    private LogEntry<MemorySegment> createLogEntry(long operationType, MemorySegment key, MemorySegment value, long timestamp) {
+    private LogEntry<MemorySegment> createLogEntry(
+            long operationType, MemorySegment key, MemorySegment value, long timestamp) {
         return new BaseLogEntry<>(
                 OperationType.values()[(int) operationType],
                 new BaseEntry<>(key, value),
