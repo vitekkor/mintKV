@@ -107,7 +107,7 @@ public class ReplicatedLogManagerTest {
 
     private List<LogEntry<MemorySegment>> deserializeLogEntries(
             FileChannel fileChannel, Path logFile) throws IOException {
-        //CHECKSTYLE.OFF: SuppressionCommentFilter
+        //CHECKSTYLE.OFF: VariableDeclarationUsageDistanceCheck
         List<LogEntry<MemorySegment>> logEntries = new ArrayList<>();
         int offset = 0;
         while (offset < Files.size(logFile)) {
