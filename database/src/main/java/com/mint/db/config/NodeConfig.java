@@ -5,16 +5,18 @@ import java.util.List;
 public final class NodeConfig {
     private int port;
     private int nodeId;
+    private String logDir;
     private List<String> cluster;
 
-    public NodeConfig() {
+    private NodeConfig() {
 
     }
 
-    public NodeConfig(int port, int nodeId, List<String> cluster) {
+    public NodeConfig(int port, int nodeId, String logDir, List<String> cluster) {
         this.port = port;
         this.nodeId = nodeId;
         this.cluster = cluster;
+        this.logDir = logDir;
     }
 
     public int getPort() {
@@ -23,6 +25,10 @@ public final class NodeConfig {
 
     public int getNodeId() {
         return nodeId;
+    }
+
+    public String getLogDir() {
+        return logDir;
     }
 
     public List<String> getCluster() {
@@ -39,5 +45,9 @@ public final class NodeConfig {
 
     public void setCluster(List<String> cluster) {
         this.cluster = cluster;
+    }
+
+    public void setLogDir(String logDir) {
+        this.logDir = logDir;
     }
 }
