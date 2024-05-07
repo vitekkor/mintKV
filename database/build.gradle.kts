@@ -1,7 +1,9 @@
+import com.google.protobuf.gradle.*
+
 plugins {
     id("java")
-    id("com.google.protobuf") version "0.9.4"
     id("idea")
+    id("com.google.protobuf") version "0.9.4"
 }
 
 repositories {
