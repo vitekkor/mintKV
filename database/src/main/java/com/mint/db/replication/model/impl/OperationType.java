@@ -12,4 +12,13 @@ public enum OperationType {
     public int getValue() {
         return value;
     }
+
+    public static OperationType fromLong(long operationType) {
+        return switch ((int) operationType) {
+            case 0 -> GET;
+            case 1 -> PUT;
+            case 2 -> DELETE;
+            default -> throw new IllegalArgumentException("Invalid OperationType value: " + operationType);
+        };
+    }
 }
