@@ -1,5 +1,7 @@
 package com.mint.db.impl;
 
+import com.mint.db.Dao;
+import com.mint.db.Entry;
 import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.grpc.InternalGrpcActor;
@@ -10,8 +12,16 @@ import com.mint.db.replication.model.Message;
 import com.mint.db.replication.model.impl.BaseLogEntry;
 import com.mint.db.replication.model.impl.FollowerMessage;
 import com.mint.db.replication.model.impl.LeaderMessage;
+import io.grpc.Grpc;
+import io.grpc.InsecureServerCredentials;
+import io.grpc.Server;
+import io.grpc.ServerCall;
 import io.grpc.Status;
 import io.grpc.StatusException;
+import io.grpc.okhttp.internal.proxy.HttpUrl;
+import io.grpc.okhttp.internal.proxy.Request;
+import io.grpc.okhttp.internal.proxy.HttpUrl;
+import io.grpc.okhttp.internal.proxy.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -20,6 +30,8 @@ import java.lang.foreign.MemorySegment;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.lang.foreign.MemorySegment;
+import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -40,6 +52,10 @@ public class RaftActor {
     private final int nodeId;
     private final ScheduledExecutorService scheduledExecutor;
     private ScheduledFuture<?> scheduledFuture;
+
+    private Server server; //stub
+    private final Dao<MemorySegment, Entry<MemorySegment>> dao;
+
     private final ReplicatedLogManager<MemorySegment> replicatedLogManager;
     private final NodeConfig config;
     private final LinkedList<LogEntry<MemorySegment>> log = new LinkedList<>();
@@ -49,7 +65,18 @@ public class RaftActor {
     private int votedForMe = 0;
 
     public RaftActor(InternalGrpcActor internalGrpcActor, NodeConfig config) {
+        this(null, internalGrpcActor, config); // fixme
+  }
+
+    public RaftActor(
+            Dao<MemorySegment, Entry<MemorySegment>> dao,
+            InternalGrpcActor internalGrpcActor,
+            NodeConfig config
+    ) {
         this.scheduledExecutor = Executors.newScheduledThreadPool(POOL_SIZE);
+
+        this.dao = dao;
+
         this.replicatedLogManager = new ReplicatedLogManagerImpl(config);
         this.config = config;
         this.internalGrpcActor = internalGrpcActor;
@@ -209,4 +236,33 @@ public class RaftActor {
     private static int quorum(final int clusterSize) {
         return clusterSize / 2 + 1;
     }
+
+    private Entry<MemorySegment> processLocal(Request request) {
+        String methodName = request.headers().get("Method");
+
+        if (methodName.equals("method GET")) { //todo проверить сработает или нет, не уверен какой формат header'а точно
+            return dao.get(MemorySegment.ofArray("what key?".getBytes(StandardCharsets.UTF_8))); //fixme как получить id из request? в каком он формате?
+        } else {
+            dao.upsert(new BaseEntry<>(
+                    MemorySegment.ofArray("what a key?".getBytes(StandardCharsets.UTF_8)), //fixme тот же вопрос
+                    MemorySegment.ofArray("value?".getBytes(StandardCharsets.UTF_8))
+            ));
+
+
+            for (String url : config.getCluster()) {
+                Request proxyRequest = new Request.Builder()
+                        .header("Method", methodName)
+                        .url(new HttpUrl.Builder()
+                                .host("host???") //fixme какой указывать здесь эндпоинт для формирования обращения к другим нодам?
+                                .port(0000)
+                                .build()
+                        )
+                        .build();
+            }
+
+        }
+
+        return null;
+    }
+
 }
