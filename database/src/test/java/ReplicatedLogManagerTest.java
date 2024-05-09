@@ -138,7 +138,7 @@ public class ReplicatedLogManagerTest {
     private LogEntry<MemorySegment> createLogEntry(
             OperationType operationType, MemorySegment key, MemorySegment value, long timestamp) {
         return new BaseLogEntry<>(
-                OperationType.values()[operationType.getValue()],
+                operationType,
                 new BaseEntry<>(key, value),
                 timestamp
         );

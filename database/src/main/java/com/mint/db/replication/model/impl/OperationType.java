@@ -1,7 +1,7 @@
 package com.mint.db.replication.model.impl;
 
 public enum OperationType {
-    GET(0), PUT(1), DELETE(2);
+    GET(1), PUT(2), DELETE(3);
 
     private final int value;
 
@@ -15,9 +15,9 @@ public enum OperationType {
 
     public static OperationType fromLong(long operationType) {
         return switch ((int) operationType) {
-            case 0 -> GET;
-            case 1 -> PUT;
-            case 2 -> DELETE;
+            case 1 -> GET;
+            case 2 -> PUT;
+            case 3 -> DELETE;
             default -> throw new IllegalArgumentException("Invalid OperationType value: " + operationType);
         };
     }

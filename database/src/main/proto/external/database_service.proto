@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package database;
+package com.mint;
 
 enum ReadMode {
   READ_COMMITTED = 0;
