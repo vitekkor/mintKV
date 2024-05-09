@@ -15,7 +15,6 @@ import com.mint.db.replication.model.impl.LeaderMessage;
 import io.grpc.Grpc;
 import io.grpc.InsecureServerCredentials;
 import io.grpc.Server;
-import io.grpc.ServerCall;
 import io.grpc.Status;
 import io.grpc.StatusException;
 import io.grpc.okhttp.internal.proxy.HttpUrl;
