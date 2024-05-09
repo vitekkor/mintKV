@@ -5,12 +5,15 @@ import com.mint.plugins.apply
 import org.gradle.api.JavaVersion
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.plugins.JavaPluginExtension
+import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.kotlin.dsl.dependencies
 import org.gradle.kotlin.dsl.getByName
+import org.gradle.kotlin.dsl.withType
 
 class JavaConfigurationPlugin : Plugin<Project> by apply<JavaConfiguration>()
 
@@ -41,6 +44,10 @@ class JavaConfiguration(project: Project) : PluginAdapter(project) {
 
         tasks.getByName<JavaCompile>("compileTestJava") {
             options.compilerArgs.add("--enable-preview")
+        }
+
+        tasks.withType<Copy> {
+            duplicatesStrategy = DuplicatesStrategy.INCLUDE
         }
     }
 }
