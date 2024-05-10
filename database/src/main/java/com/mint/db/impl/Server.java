@@ -1,6 +1,7 @@
 package com.mint.db.impl;
 
 import com.mint.db.config.NodeConfig;
+import com.mint.db.exceptions.ServerStartupException;
 import io.grpc.ServerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,6 +25,7 @@ public class Server {
             server.start();
         } catch (IOException e) {
             log.error("Failed to start server", e);
+            throw new ServerStartupException();
         }
     }
 
