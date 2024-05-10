@@ -32,7 +32,8 @@ public class ReplicatedLogManagerTest {
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
                 StringDaoWrapper.toMemorySegment("value"),
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                0
         );
         logManager.appendLogEntry(logEntry);
         Path logFile = logManager.getLogFile();
@@ -55,7 +56,8 @@ public class ReplicatedLogManagerTest {
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
                 null,
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                0
         );
         logManager.appendLogEntry(logEntry);
         Path logFile = logManager.getLogFile();
@@ -78,14 +80,16 @@ public class ReplicatedLogManagerTest {
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
                 StringDaoWrapper.toMemorySegment("value"),
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                0
         );
         logManager.appendLogEntry(logEntry);
         LogEntry<MemorySegment> logEntry2 = createLogEntry(
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key2"),
                 StringDaoWrapper.toMemorySegment("value2"),
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                1
         );
         logManager.appendLogEntry(logEntry2);
         Path logFile = logManager.getLogFile();
@@ -129,18 +133,21 @@ public class ReplicatedLogManagerTest {
             }
             long timestamp = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
             offset += Long.BYTES;
-            logEntries.add(createLogEntry(OperationType.fromLong(operationType), key, value, timestamp));
+            long term = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
+            offset += Long.BYTES;
+            logEntries.add(createLogEntry(OperationType.fromLong(operationType), key, value, timestamp, term));
         }
         return logEntries;
         //CHECKSTYLE.ON
     }
 
     private LogEntry<MemorySegment> createLogEntry(
-            OperationType operationType, MemorySegment key, MemorySegment value, long timestamp) {
+            OperationType operationType, MemorySegment key, MemorySegment value, long timestamp, long term) {
         return new BaseLogEntry<>(
                 operationType,
                 new BaseEntry<>(key, value),
-                timestamp
+                timestamp,
+                term
         );
     }
 

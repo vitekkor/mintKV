@@ -64,6 +64,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
             writeLong(-1, outputStream);
         }
         writeLong(logEntry.timestamp(), outputStream);
+        writeLong(logEntry.term(), outputStream);
     }
 
     private void writeLong(
