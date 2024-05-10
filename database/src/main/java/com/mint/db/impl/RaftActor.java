@@ -159,9 +159,9 @@ public class RaftActor {
 
         // check the relevance of the candidate log
         LogEntry<MemorySegment> lastLogEntry = log.isEmpty() ? null : log.getLast();
-        boolean isLogUpToDate = (lastLogEntry == null) ||
-                (request.getLastLogTerm() > lastLogEntry.term()) ||
-                (request.getLastLogTerm() == lastLogEntry.term() && request.getLastLogIndex() >= log.size() - 1);
+        boolean isLogUpToDate = (lastLogEntry == null)
+                || (request.getLastLogTerm() > lastLogEntry.term())
+                || (request.getLastLogTerm() == lastLogEntry.term() && request.getLastLogIndex() >= log.size() - 1);
 
         // new term or node has not voted for another and their log is up-to-date (voteRequest retry)
         if (request.getTerm() > currentTerm || !isAlreadyVotedForAnother && isLogUpToDate) {
