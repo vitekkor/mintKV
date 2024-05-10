@@ -81,7 +81,7 @@ class RaftActorTest {
             RaftActor raftActor = new RaftActor(internalGrpcActor, nodeConfig);
             cluster.add(raftActor);
         }
-
+        //CHECKSTYLE.OFF: IndentationCheck
         Awaitility.await().atMost(11, TimeUnit.SECONDS)
                 .untilAtomic(
                         internalGrpcActorInvocations,
@@ -95,5 +95,6 @@ class RaftActorTest {
                 );
         Mockito.verify(internalGrpcActor, Mockito.times(1))
                 .onAppendEntityRequest(Mockito.any(Raft.AppendEntriesRequest.class));
+        //CHECKSTYLE.ON: IndentationCheck
     }
 }
