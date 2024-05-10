@@ -20,4 +20,9 @@ public record BaseLogEntry<D>(OperationType operationType, Entry<D> entry, long 
     public String toString() {
         return STR."{ operationType=\{operationType}, entry=\{entry}, timestamp=\{timestamp} }";
     }
+
+    @Override
+    public long term() {
+        return 0;
+    }
 }
