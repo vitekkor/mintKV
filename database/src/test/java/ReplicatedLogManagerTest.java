@@ -29,7 +29,7 @@ public class ReplicatedLogManagerTest {
     public void testAppendLogEntry() throws IOException {
         ReplicatedLogManagerImpl logManager = new ReplicatedLogManagerImpl(ConfigParser.parseConfig());
         LogEntry<MemorySegment> logEntry = createLogEntry(
-                OperationType.PUT.getValue(),
+                OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
                 StringDaoWrapper.toMemorySegment("value"),
                 System.currentTimeMillis()
@@ -52,7 +52,7 @@ public class ReplicatedLogManagerTest {
     public void testAppendLogEntryWithNullValue() throws IOException {
         ReplicatedLogManagerImpl logManager = new ReplicatedLogManagerImpl(ConfigParser.parseConfig());
         LogEntry<MemorySegment> logEntry = createLogEntry(
-                OperationType.PUT.getValue(),
+                OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
                 null,
                 System.currentTimeMillis()
@@ -75,14 +75,14 @@ public class ReplicatedLogManagerTest {
     public void testAppendLogEntryWithTwoValues() throws IOException {
         ReplicatedLogManagerImpl logManager = new ReplicatedLogManagerImpl(ConfigParser.parseConfig());
         LogEntry<MemorySegment> logEntry = createLogEntry(
-                OperationType.PUT.getValue(),
+                OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
                 StringDaoWrapper.toMemorySegment("value"),
                 System.currentTimeMillis()
         );
         logManager.appendLogEntry(logEntry);
         LogEntry<MemorySegment> logEntry2 = createLogEntry(
-                OperationType.PUT.getValue(),
+                OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key2"),
                 StringDaoWrapper.toMemorySegment("value2"),
                 System.currentTimeMillis()
@@ -129,16 +129,16 @@ public class ReplicatedLogManagerTest {
             }
             long timestamp = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
             offset += Long.BYTES;
-            logEntries.add(createLogEntry(operationType, key, value, timestamp));
+            logEntries.add(createLogEntry(OperationType.fromLong(operationType), key, value, timestamp));
         }
         return logEntries;
         //CHECKSTYLE.ON
     }
 
     private LogEntry<MemorySegment> createLogEntry(
-            long operationType, MemorySegment key, MemorySegment value, long timestamp) {
+            OperationType operationType, MemorySegment key, MemorySegment value, long timestamp) {
         return new BaseLogEntry<>(
-                OperationType.values()[(int) operationType],
+                operationType,
                 new BaseEntry<>(key, value),
                 timestamp
         );

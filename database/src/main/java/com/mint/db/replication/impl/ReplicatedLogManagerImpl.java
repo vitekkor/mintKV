@@ -42,15 +42,6 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         }
     }
 
-    private static long getLogEntrySize(LogEntry<MemorySegment> logEntry) {
-        return Long.BYTES // operationType
-                + Long.BYTES // keySize
-                + logEntry.entry().key().byteSize() // key
-                + Long.BYTES // valueSize
-                + (logEntry.entry().value() == null ? 0 : logEntry.entry().value().byteSize()) // value
-                + Long.BYTES; // timestamp
-    }
-
     @Override
     public synchronized void appendLogEntry(LogEntry<MemorySegment> logEntry) {
         try {

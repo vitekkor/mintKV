@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package com.mint.db;
+
 enum Operation {
   UNDEFINED = 0;
   GET = 1;
