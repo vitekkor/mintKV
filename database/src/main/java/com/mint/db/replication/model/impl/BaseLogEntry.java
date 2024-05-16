@@ -7,17 +7,23 @@ import com.mint.db.replication.model.LogEntry;
 
 import java.lang.foreign.MemorySegment;
 
-public record BaseLogEntry<D>(OperationType operationType, Entry<D> entry, long timestamp) implements LogEntry<D> {
+public record BaseLogEntry<D>(
+        OperationType operationType,
+        Entry<D> entry,
+        long timestamp,
+        long term
+) implements LogEntry<D> {
     public static BaseLogEntry<MemorySegment> valueOf(Raft.LogEntry entry) {
         return new BaseLogEntry<>(
                 OperationType.valueOf(entry.getOperation().name()),
                 BaseEntry.valueOf(entry),
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                entry.getTerm()
         );
     }
 
     @Override
     public String toString() {
-        return STR."{ operationType=\{operationType}, entry=\{entry}, timestamp=\{timestamp} }";
+        return STR."{ operationType=\{operationType}, entry=\{entry}, timestamp=\{timestamp}, term=\{term} }";
     }
 }

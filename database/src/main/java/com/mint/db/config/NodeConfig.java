@@ -50,4 +50,8 @@ public final class NodeConfig {
     public void setLogDir(String logDir) {
         this.logDir = logDir;
     }
+
+    public NodeConfig copy() {
+        return new NodeConfig(port, nodeId, logDir, cluster);
+    }
 }

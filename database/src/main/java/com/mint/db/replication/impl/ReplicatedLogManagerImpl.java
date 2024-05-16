@@ -26,8 +26,8 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private final NodeConfig nodeConfig;
     private final Path logFile;
     private final OutputStream outputStream;
-    private ByteArraySegment longBuffer = new ByteArraySegment(Long.BYTES);
-    private ByteArraySegment blobBuffer = new ByteArraySegment(BLOB_BUFFER_SIZE);
+    private final ByteArraySegment longBuffer = new ByteArraySegment(Long.BYTES);
+    private final ByteArraySegment blobBuffer = new ByteArraySegment(BLOB_BUFFER_SIZE);
 
     public ReplicatedLogManagerImpl(NodeConfig nodeConfig) {
         this.nodeConfig = nodeConfig;
@@ -64,6 +64,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
             writeLong(-1, outputStream);
         }
         writeLong(logEntry.timestamp(), outputStream);
+        writeLong(logEntry.term(), outputStream);
     }
 
     private void writeLong(

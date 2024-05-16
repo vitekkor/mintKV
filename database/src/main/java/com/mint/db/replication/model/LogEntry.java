@@ -9,4 +9,6 @@ public interface LogEntry<D> {
     Entry<D> entry();
 
     long timestamp();
+
+    long term();
 }

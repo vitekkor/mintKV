@@ -1,4 +1,5 @@
-import com.google.protobuf.gradle.*
+import com.google.protobuf.gradle.id
+import com.google.protobuf.gradle.proto
 
 plugins {
     `java-configuration`
@@ -14,11 +15,20 @@ dependencies {
     // Logging
     implementation("org.slf4j:slf4j-api:2.0.12")
     implementation("ch.qos.logback:logback-classic:1.5.3")
+
     implementation("org.yaml:snakeyaml:2.2")
+
     implementation("io.grpc:grpc-all:1.63.0")
     compileOnly("org.apache.tomcat:annotations-api:6.0.53")
 
     implementation("com.google.protobuf:protobuf-java:3.6.1")
+
+    // test
+    testImplementation("org.mockito:mockito-core:5.11.0")
+    testImplementation("org.powermock:powermock-module-junit4:2.0.9")
+    testImplementation("org.powermock:powermock-api-mockito2:2.0.9")
+    testImplementation("org.awaitility:awaitility:4.2.1")
+
 }
 
 protobuf {
@@ -55,4 +65,6 @@ sourceSets {
     }
 }
 
-
+tasks.test {
+    testLogging.showStandardStreams = true
+}
