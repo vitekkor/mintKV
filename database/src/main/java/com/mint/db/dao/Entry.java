@@ -1,4 +1,4 @@
-package com.mint.db;
+package com.mint.db.dao;
 
 public interface Entry<D> {
     D key();

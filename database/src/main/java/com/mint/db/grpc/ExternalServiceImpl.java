@@ -1,4 +1,4 @@
-package com.mint.db.impl;
+package com.mint.db.grpc;
 
 import com.mint.DatabaseServiceGrpc;
 import com.mint.DatabaseServiceOuterClass;

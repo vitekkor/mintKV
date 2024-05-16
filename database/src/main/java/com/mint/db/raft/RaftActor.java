@@ -1,4 +1,4 @@
-package com.mint.db.impl;
+package com.mint.db.raft;
 
 import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;

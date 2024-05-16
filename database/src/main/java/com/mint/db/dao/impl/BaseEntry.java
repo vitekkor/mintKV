@@ -1,6 +1,6 @@
-package com.mint.db.impl;
+package com.mint.db.dao.impl;
 
-import com.mint.db.Entry;
+import com.mint.db.dao.Entry;
 import com.mint.db.Raft;
 
 import java.lang.foreign.MemorySegment;

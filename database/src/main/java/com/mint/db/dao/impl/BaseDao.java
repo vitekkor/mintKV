@@ -1,7 +1,7 @@
-package com.mint.db.impl;
+package com.mint.db.dao.impl;
 
-import com.mint.db.Dao;
-import com.mint.db.Entry;
+import com.mint.db.dao.Dao;
+import com.mint.db.dao.Entry;
 
 import java.lang.foreign.MemorySegment;
 import java.util.Iterator;

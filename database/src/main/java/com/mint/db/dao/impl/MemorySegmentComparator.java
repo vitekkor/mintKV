@@ -1,9 +1,11 @@
-package com.mint.db.impl;
+package com.mint.db.dao.impl;
 
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 
 public class MemorySegmentComparator {
+    private MemorySegmentComparator() {
+    }
 
     public static int compare(MemorySegment o1, MemorySegment o2) {
         return compareWithOffsets(o1, 0, o1.byteSize(), o2, 0, o2.byteSize());
@@ -11,7 +13,8 @@ public class MemorySegmentComparator {
 
     public static int compareWithOffsets(
             MemorySegment o1, long o1FromOffset, long o1ToOffset,
-            MemorySegment o2, long o2FromOffset, long o2ToOffset) {
+            MemorySegment o2, long o2FromOffset, long o2ToOffset
+    ) {
         long relativeOffset = MemorySegment.mismatch(o1, o1FromOffset, o1ToOffset, o2, o2FromOffset, o2ToOffset);
         if (relativeOffset == -1) {
             return 0;

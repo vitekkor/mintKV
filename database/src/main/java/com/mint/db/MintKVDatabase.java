@@ -1,7 +1,7 @@
-package com.mint;
+package com.mint.db;
 
 import com.mint.db.config.NodeConfig;
-import com.mint.db.impl.Server;
+import com.mint.db.grpc.Server;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

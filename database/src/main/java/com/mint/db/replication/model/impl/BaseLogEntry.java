@@ -1,8 +1,8 @@
 package com.mint.db.replication.model.impl;
 
-import com.mint.db.Entry;
+import com.mint.db.dao.Entry;
 import com.mint.db.Raft;
-import com.mint.db.impl.BaseEntry;
+import com.mint.db.dao.impl.BaseEntry;
 import com.mint.db.replication.model.LogEntry;
 
 import java.lang.foreign.MemorySegment;
