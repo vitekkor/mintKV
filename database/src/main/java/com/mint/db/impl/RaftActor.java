@@ -60,7 +60,7 @@ public class RaftActor {
 
     public RaftActor(InternalGrpcActor internalGrpcActor, NodeConfig config) {
         this(null, internalGrpcActor, config); // fixme
-  }
+    }
 
     public RaftActor(
             Dao<MemorySegment, Entry<MemorySegment>> dao,
