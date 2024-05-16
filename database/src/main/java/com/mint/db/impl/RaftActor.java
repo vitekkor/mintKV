@@ -12,13 +12,9 @@ import com.mint.db.replication.model.Message;
 import com.mint.db.replication.model.impl.BaseLogEntry;
 import com.mint.db.replication.model.impl.FollowerMessage;
 import com.mint.db.replication.model.impl.LeaderMessage;
-import io.grpc.Grpc;
-import io.grpc.InsecureServerCredentials;
 import io.grpc.Server;
 import io.grpc.Status;
 import io.grpc.StatusException;
-import io.grpc.okhttp.internal.proxy.HttpUrl;
-import io.grpc.okhttp.internal.proxy.Request;
 import io.grpc.okhttp.internal.proxy.HttpUrl;
 import io.grpc.okhttp.internal.proxy.Request;
 import org.slf4j.Logger;
@@ -26,11 +22,10 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.lang.foreign.MemorySegment;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
-import java.lang.foreign.MemorySegment;
-import java.nio.charset.StandardCharsets;
 import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -236,6 +231,14 @@ public class RaftActor {
         return clusterSize / 2 + 1;
     }
 
+    // TODO давай разделим метод processLocal на 2 метода - processLocalGet и processLocalInsertOrDelete
+    // TODO входные параметры processLocalGet:
+    //      - ByteString key
+    // TODO входные параметры processLocalInsertOrDelete:
+    //      - boolean insert - true - insert, false - delete
+    //      - ByteString key
+    //      - ByteString value (null если delete)
+    // TODO Вместо `new Request.Builder()` - internalGrpcActor.onAppendEntityRequest (см строки 123-131)
     private Entry<MemorySegment> processLocal(Request request) {
         String methodName = request.headers().get("Method");
 
