@@ -34,7 +34,7 @@ public class RaftActor {
     private static final Random rand = new Random();
     private static final int POOL_SIZE = 1;
     private static final long HEARTBEAT_DELAY_MS = 5000L;
-    public static final String NODE_ID = "nodeId";
+    public static final String MDC_NODE_ID = "nodeId";
 
     private final InternalGrpcActor internalGrpcActor;
     private final int nodeId;
@@ -71,7 +71,7 @@ public class RaftActor {
     }
 
     private synchronized void onHeartBeatNotReceived() {
-        MDC.put(NODE_ID, String.valueOf(nodeId));
+        MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
         logger.info("HeartBeat not received.");
         votedFor = nodeId;
         currentTerm++;
@@ -88,7 +88,7 @@ public class RaftActor {
     }
 
     public void onHeartBeat() throws StatusException {
-        MDC.put(NODE_ID, String.valueOf(nodeId));
+        MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
         if (amILeader.getOpaque()) {
             throw new StatusException(Status.FAILED_PRECONDITION);
         }
@@ -140,7 +140,7 @@ public class RaftActor {
     }
 
     public synchronized Raft.VoteResponse onRequestVote(Raft.VoteRequest request) {
-        MDC.put(NODE_ID, String.valueOf(nodeId));
+        MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
         logger.info("Receive new VoteRequest {}", protobufMessageToString(request));
 
         Raft.VoteResponse.Builder responseBuilder = Raft.VoteResponse.newBuilder();
@@ -184,7 +184,7 @@ public class RaftActor {
     }
 
     public synchronized void onVoteResponse(Raft.VoteResponse voteResponse) {
-        MDC.put(NODE_ID, String.valueOf(nodeId));
+        MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
         logger.info("Receive new VoteResponse {}", protobufMessageToString(voteResponse));
         if (voteResponse.getVoteGranted()) {
             votedForMe++;
@@ -197,7 +197,7 @@ public class RaftActor {
                 sendHeartBeats();
             }
         }
-        MDC.remove(NODE_ID);
+        MDC.remove(MDC_NODE_ID);
     }
 
     private void appendEntitiesIntoLog(Raft.AppendEntriesRequest request) {

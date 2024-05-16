@@ -11,4 +11,14 @@ public class LeaderMessage extends Message {
         this.leaderUrl = leaderUrl;
         this.request = request;
     }
+
+    @Override
+    public String nodeUrl() {
+        return leaderUrl;
+    }
+
+    @Override
+    public Raft.AppendEntriesRequest request() {
+        return request;
+    }
 }

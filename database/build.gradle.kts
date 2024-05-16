@@ -23,6 +23,9 @@ dependencies {
 
     implementation("com.google.protobuf:protobuf-java:3.6.1")
 
+    // DI
+    implementation("com.google.inject:guice:7.0.0")
+
     // test
     testImplementation("org.mockito:mockito-core:5.11.0")
     testImplementation("org.powermock:powermock-module-junit4:2.0.9")

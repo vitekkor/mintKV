@@ -1,31 +1,20 @@
 package com.mint.db;
 
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.mint.db.config.ConfigParser;
+import com.mint.db.config.InjectionModule;
 import com.mint.db.config.NodeConfig;
-import com.mint.db.grpc.Server;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.mint.db.grpc.server.Server;
 
-import java.util.List;
+import java.io.FileNotFoundException;
 
 public class MintKVDatabase {
-    private static final Logger log = LoggerFactory.getLogger(MintKVDatabase.class);
 
-    public static void main(String[] args) {
-        NodeConfig nodeConfig = new NodeConfig(
-                8080,
-                1,
-                "logs/1",
-                List.of("localhost:8080")
-        );
-        Server server = new Server(nodeConfig);
+    public static void main(String[] args) throws InterruptedException {
+        Injector injector = Guice.createInjector(new InjectionModule());
+        Server server = injector.getInstance(Server.class);
         server.start();
-
-        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-            log.info("Shutting down server");
-            server.stop();
-        }));
-
-        while (true) {
-        }
+        server.blockUntilShutdown();
     }
 }
