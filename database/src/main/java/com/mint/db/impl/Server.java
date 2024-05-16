@@ -15,8 +15,8 @@ public class Server {
     public Server(NodeConfig config) {
         this.server = ServerBuilder
                 .forPort(config.getPort())
-                .addService(new InternalServiceImpl())
                 .addService(new ExternalServiceImpl())
+                .addService(new InternalServiceImpl())
                 .build();
     }
 

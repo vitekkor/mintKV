@@ -1,31 +1,23 @@
 package com.mint.db.impl;
 
-import com.mint.DatabaseServiceGrpc;
-import com.mint.DatabaseServiceOuterClass;
+import com.mint.db.Raft;
+import com.mint.db.RaftServiceGrpc;
 import io.grpc.stub.StreamObserver;
 
-public class InternalServiceImpl extends DatabaseServiceGrpc.DatabaseServiceImplBase {
+public class InternalServiceImpl extends RaftServiceGrpc.RaftServiceImplBase {
     @Override
-    public void insert(
-            DatabaseServiceOuterClass.InsertRequest request,
-            StreamObserver<DatabaseServiceOuterClass.SuccessfulWriteResponse> responseObserver
+    public void requestVote(
+            Raft.VoteRequest request,
+            StreamObserver<Raft.VoteResponse> responseObserver
     ) {
-        super.insert(request, responseObserver);
+        super.requestVote(request, responseObserver);
     }
 
     @Override
-    public void delete(
-            DatabaseServiceOuterClass.DeleteRequest request,
-            StreamObserver<DatabaseServiceOuterClass.SuccessfulWriteResponse> responseObserver
+    public void appendEntries(
+            Raft.AppendEntriesRequest request,
+            StreamObserver<Raft.AppendEntriesResponse> responseObserver
     ) {
-        super.delete(request, responseObserver);
-    }
-
-    @Override
-    public void get(
-            DatabaseServiceOuterClass.GetRequest request,
-            StreamObserver<DatabaseServiceOuterClass.GetResponse> responseObserver
-    ) {
-        super.get(request, responseObserver);
+        super.appendEntries(request, responseObserver);
     }
 }
