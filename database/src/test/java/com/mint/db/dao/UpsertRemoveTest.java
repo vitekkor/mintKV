@@ -1,7 +1,9 @@
-import com.mint.db.impl.StringDaoWrapper;
+package com.mint.db.dao;
+
+import com.mint.db.dao.impl.StringDaoWrapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import util.BaseTest;
+import com.mint.db.dao.util.BaseTest;
 
 class UpsertRemoveTest extends BaseTest {
     private final StringDaoWrapper dao = new StringDaoWrapper();

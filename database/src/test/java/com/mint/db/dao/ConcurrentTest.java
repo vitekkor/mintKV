@@ -1,8 +1,9 @@
-import com.mint.db.Entry;
-import com.mint.db.impl.StringDaoWrapper;
+package com.mint.db.dao;
+
+import com.mint.db.dao.impl.StringDaoWrapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
-import util.BaseTest;
+import com.mint.db.dao.util.BaseTest;
 
 import java.util.List;
 

@@ -1,9 +1,10 @@
-import com.mint.db.Entry;
-import com.mint.db.impl.StringDaoWrapper;
+package com.mint.db.dao;
+
+import com.mint.db.dao.impl.StringDaoWrapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.opentest4j.AssertionFailedError;
-import util.BaseTest;
+import com.mint.db.dao.util.BaseTest;
 
 import java.util.ArrayList;
 import java.util.Iterator;

@@ -1,7 +1,7 @@
-package util;
+package com.mint.db.dao.util;
 
-import com.mint.db.Entry;
-import com.mint.db.impl.BaseEntry;
+import com.mint.db.dao.Entry;
+import com.mint.db.dao.impl.BaseEntry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.opentest4j.AssertionFailedError;

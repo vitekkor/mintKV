@@ -1,6 +1,8 @@
+package com.mint.db.dao;
+
 import com.mint.db.config.ConfigParser;
-import com.mint.db.impl.BaseEntry;
-import com.mint.db.impl.StringDaoWrapper;
+import com.mint.db.dao.impl.BaseEntry;
+import com.mint.db.dao.impl.StringDaoWrapper;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
 import com.mint.db.replication.model.LogEntry;
 import com.mint.db.replication.model.impl.BaseLogEntry;

@@ -1,0 +1,6 @@
+port: 8080
+nodeId: 1
+logDir: /var/logs
+cluster:
+  - node1
+  - node2

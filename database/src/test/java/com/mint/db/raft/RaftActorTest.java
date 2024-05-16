@@ -1,8 +1,8 @@
-package com.mint.db;
+package com.mint.db.raft;
 
+import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.grpc.InternalGrpcActor;
-import com.mint.db.impl.RaftActor;
 import org.awaitility.Awaitility;
 import org.hamcrest.comparator.ComparatorMatcherBuilder;
 import org.junit.jupiter.api.Assertions;
