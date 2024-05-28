@@ -1,5 +1,6 @@
 port: 8080
 nodeId: 0
+heartbeatTimeoutMs: 5000
 cluster:
   - "http://localhost:8081"
   - "http://localhost:8082"

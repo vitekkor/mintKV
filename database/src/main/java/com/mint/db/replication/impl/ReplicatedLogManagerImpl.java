@@ -32,6 +32,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private final ByteArraySegment blobBuffer = new ByteArraySegment(BLOB_BUFFER_SIZE);
 
     private PersistentState state;
+    private long commitIndex = 0; // todo read from file
 
     public ReplicatedLogManagerImpl(NodeConfig nodeConfig, PersistentState state) {
         this.nodeConfig = nodeConfig;
@@ -77,6 +78,16 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     @Override
     public LogEntry<MemorySegment> readLog(long index) {
         throw new RuntimeException("Not implemented"); // TODO
+    }
+
+    @Override
+    public long commitIndex() {
+        return commitIndex;
+    }
+
+    public void setCommitIndex(long commitIndex) {
+        // todo write to file
+        this.commitIndex = commitIndex;
     }
 
     private void serializeLogEntry(LogEntry<MemorySegment> logEntry) throws IOException {

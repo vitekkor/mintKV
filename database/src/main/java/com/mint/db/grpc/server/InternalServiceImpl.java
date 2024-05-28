@@ -19,8 +19,7 @@ public class InternalServiceImpl extends RaftServiceGrpc.RaftServiceImplBase {
             Raft.VoteRequest request,
             StreamObserver<Raft.VoteResponse> responseObserver
     ) {
-        Raft.VoteResponse voteResponse = raftActor.onRequestVote(request);
-        responseObserver.onNext(voteResponse);
+        raftActor.onRequestVote(request, (responseObserver::onNext));
     }
 
     @Override
@@ -28,6 +27,6 @@ public class InternalServiceImpl extends RaftServiceGrpc.RaftServiceImplBase {
             Raft.AppendEntriesRequest request,
             StreamObserver<Raft.AppendEntriesResponse> responseObserver
     ) {
-        super.appendEntries(request, responseObserver);
+        raftActor.onAppendEntry(request, responseObserver::onNext);
     }
 }

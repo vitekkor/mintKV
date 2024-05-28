@@ -6,15 +6,17 @@ public final class NodeConfig {
     private int port;
     private int nodeId;
     private String logDir;
+    private long heartbeatTimeoutMs;
     private List<String> cluster;
 
     private NodeConfig() {
 
     }
 
-    public NodeConfig(int port, int nodeId, String logDir, List<String> cluster) {
+    public NodeConfig(int port, int nodeId, String logDir, long heartbeatTimeoutMs, List<String> cluster) {
         this.port = port;
         this.nodeId = nodeId;
+        this.heartbeatTimeoutMs = heartbeatTimeoutMs;
         this.cluster = cluster;
         this.logDir = logDir;
     }
@@ -52,6 +54,14 @@ public final class NodeConfig {
     }
 
     public NodeConfig copy() {
-        return new NodeConfig(port, nodeId, logDir, cluster);
+        return new NodeConfig(port, nodeId, logDir, heartbeatTimeoutMs, cluster);
+    }
+
+    public long getHeartbeatTimeoutMs() {
+        return heartbeatTimeoutMs;
+    }
+
+    public boolean heartbeatRandom() {
+        return true;
     }
 }

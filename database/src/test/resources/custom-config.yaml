@@ -1,6 +1,7 @@
 port: 8800
 nodeId: 11
 logDir: /var/logs2
+heartbeatTimeoutMs: 200
 cluster: # comment
   - node1
   - node2

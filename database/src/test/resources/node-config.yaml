@@ -1,5 +1,6 @@
 port: 8080
 nodeId: 1
+heartbeatTimeoutMs: 5000
 logDir: /var/logs
 cluster:
   - node1

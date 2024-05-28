@@ -26,4 +26,6 @@ public interface ReplicatedLogManager<D> {
      * Reads log entry at the specified index, return `null` if the entry is not present.
      */
     LogEntry<D> readLog(long index);
+
+    long commitIndex();
 }

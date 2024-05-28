@@ -4,6 +4,8 @@ import com.mint.db.Raft;
 import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
 
+import java.util.function.Consumer;
+
 public interface RaftActorInterface {
     /**
      * Called when timeout passed after [Environment.startTimeout]
@@ -13,7 +15,10 @@ public interface RaftActorInterface {
     /**
      * Called on arriving [appendEntriesRequest] from another process {@link Raft.AppendEntriesRequest#getLeaderId()}
      */
-    void onAppendEntry(Raft.AppendEntriesRequest appendEntriesRequest);
+    void onAppendEntry(
+            Raft.AppendEntriesRequest appendEntriesRequest,
+            Consumer<Raft.AppendEntriesResponse> onVoteResponse
+    );
 
     /**
      * Called on arriving [appendEntriesResponse] from another process {@code srcId}
@@ -26,7 +31,7 @@ public interface RaftActorInterface {
     /**
      * Called on arriving [voteRequest] from another process {@link Raft.VoteRequest#getCandidateId()}
      */
-    void onRequestVote(Raft.VoteRequest voteRequest);
+    void onRequestVote(Raft.VoteRequest voteRequest, Consumer<Raft.VoteResponse> onVoteResponse);
 
     /**
      * Called on arriving [voteResponse] from another process {@code srcId}

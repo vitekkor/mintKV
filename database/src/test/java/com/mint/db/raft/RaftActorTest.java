@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 
 import static com.mint.db.util.LogUtil.protobufMessageToString;
 
@@ -37,6 +38,7 @@ class RaftActorTest {
                 8080,
                 0,
                 logDir.toString(),
+                5000,
                 List.of(
                         "http://localhost:8080",
                         "http://localhost:8081",
@@ -52,28 +54,33 @@ class RaftActorTest {
         AtomicInteger internalGrpcActorInvocations = new AtomicInteger();
         Mockito.doAnswer(invocation -> {
             Raft.VoteRequest voteRequest = invocation.getArgument(0);
+            BiConsumer<Integer, Raft.VoteResponse> onRequestVoteResult = invocation.getArgument(1);
             int nodeId = voteRequest.getCandidateId();
             logger.info("internalGrpcActor.onLeaderCandidate({})", protobufMessageToString(voteRequest));
             for (int i = 0; i < cluster.size(); i++) {
                 if (i != nodeId) {
-                    var voteResponse = cluster.get(i).onRequestVote(voteRequest);
-                    if (nodeId == 0) {
-                        Assertions.assertTrue(voteResponse.getVoteGranted());
-                        Assertions.assertEquals(1, voteResponse.getTerm());
-                        cluster.get(nodeId).onVoteResponse(voteResponse);
-                    } else {
-                        Assertions.assertFalse(voteResponse.getVoteGranted());
-                    }
+                    int finalI = i;
+                    cluster.get(i).onRequestVote(voteRequest, (voteResponse -> {
+                        if (nodeId == 0) {
+                            Assertions.assertTrue(voteResponse.getVoteGranted());
+                            Assertions.assertEquals(1, voteResponse.getTerm());
+                            onRequestVoteResult.accept(finalI, voteResponse);
+                        } else {
+                            Assertions.assertFalse(voteResponse.getVoteGranted());
+                        }
+                    }));
                 }
             }
             internalGrpcActorInvocations.incrementAndGet();
             return null;
-        }).when(internalGrpcActor).onLeaderCandidate(Mockito.any(Raft.VoteRequest.class));
+        }).when(internalGrpcActor).sendVoteRequest(Mockito.any(Raft.VoteRequest.class), Mockito.any());
 
         for (int i = 0; i < 5; i++) {
-            final NodeConfig nodeConfig = config.copy();
+            final NodeConfig nodeConfig = Mockito.spy(config.copy());
             nodeConfig.setNodeId(i);
             nodeConfig.setPort(8080 + i);
+            Mockito.when(nodeConfig.heartbeatRandom()).thenReturn(false);
+
 
             Random random = Mockito.mock(Random.class);
             Mockito.when(random.nextLong(1000L, 5000L)).thenReturn((i + 1) * 5000L);

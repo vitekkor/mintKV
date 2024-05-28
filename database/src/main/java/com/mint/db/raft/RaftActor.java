@@ -3,38 +3,40 @@ package com.mint.db.raft;
 import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.grpc.InternalGrpcActor;
+import com.mint.db.raft.model.Command;
+import com.mint.db.raft.model.CommandResult;
+import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
-import com.mint.db.replication.model.LogEntry;
 import com.mint.db.replication.model.Message;
 import com.mint.db.replication.model.PersistentState;
 import com.mint.db.replication.model.impl.BaseLogEntry;
 import com.mint.db.replication.model.impl.FollowerMessage;
 import com.mint.db.replication.model.impl.LeaderMessage;
-import io.grpc.Status;
-import io.grpc.StatusException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.lang.foreign.MemorySegment;
+import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Random;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 import static com.mint.db.util.LogUtil.protobufMessageToString;
 
-public class RaftActor {
+public class RaftActor implements RaftActorInterface {
     private static final Logger logger = LoggerFactory.getLogger(RaftActor.class);
     private static final Random rand = new Random();
     private static final int POOL_SIZE = 1;
-    private static final long HEARTBEAT_DELAY_MS = 5000L;
     public static final String MDC_NODE_ID = "nodeId";
 
     private final InternalGrpcActor internalGrpcActor;
@@ -43,11 +45,11 @@ public class RaftActor {
     private ScheduledFuture<?> scheduledFuture;
     private final ReplicatedLogManager<MemorySegment> replicatedLogManager;
     private final NodeConfig config;
-    private final LinkedList<LogEntry<MemorySegment>> log = new LinkedList<>();
     private final AtomicBoolean amILeader = new AtomicBoolean();
-    private long currentTerm = 0;
-    private long votedFor = -1;
     private int votedForMe = 0;
+    private int leaderId = -1;
+    private final Queue<Command> queue = new ArrayDeque<>();
+    private long nextTimeout = Long.MAX_VALUE;
 
     public RaftActor(InternalGrpcActor internalGrpcActor, NodeConfig config, PersistentState state) {
         this.scheduledExecutor = Executors.newScheduledThreadPool(POOL_SIZE);
@@ -56,61 +58,26 @@ public class RaftActor {
         this.internalGrpcActor = internalGrpcActor;
         this.nodeId = config.getNodeId();
 
-        sleepBeforeElections();
+        startTimeout(Timeout.ELECTION_TIMEOUT);
     }
 
-    private void sleepBeforeElections() {
+    private void startTimeout(Timeout timeout) {
+        long heartbeatTimeoutMs = config.getHeartbeatTimeoutMs();
+        int nProcesses = config.getCluster().size();
+        this.nextTimeout = heartbeatTimeoutMs + switch (timeout) {
+            case ELECTION_TIMEOUT -> config.heartbeatRandom() ?
+                    rand.nextLong(heartbeatTimeoutMs / nProcesses, heartbeatTimeoutMs)
+                    : nodeId * heartbeatTimeoutMs / nProcesses;
+            case LEADER_HEARTBEAT_PERIOD -> 0;
+        };
+
         if (scheduledFuture != null) {
             scheduledFuture.cancel(false);
         }
 
         scheduledFuture = scheduledExecutor.schedule(
-                this::onHeartBeatNotReceived,
-                HEARTBEAT_DELAY_MS + rand.nextLong(1000L, 5000L),
-                TimeUnit.MILLISECONDS
-        );
-    }
-
-    private synchronized void onHeartBeatNotReceived() {
-        MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
-        logger.info("HeartBeat not received.");
-        votedFor = nodeId;
-        currentTerm++;
-        Raft.VoteRequest voteRequest = Raft.VoteRequest.newBuilder()
-                .setTerm(currentTerm)
-                .setCandidateId(nodeId)
-                .setLastLogIndex(log.size())
-                .setLastLogTerm(log.isEmpty() ? -1 : log.getLast().term())
-                .build();
-
-        logger.info("Send new vote request {}", protobufMessageToString(voteRequest));
-        internalGrpcActor.onLeaderCandidate(voteRequest);
-        sleepBeforeElections();
-    }
-
-    public void onHeartBeat() throws StatusException {
-        MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
-        if (amILeader.getOpaque()) {
-            throw new StatusException(Status.FAILED_PRECONDITION);
-        }
-
-        logger.info("heartbeat");
-        sleepBeforeElections();
-    }
-
-    private void sendHeartBeats() {
-        Raft.AppendEntriesRequest appendEntriesRequest = Raft.AppendEntriesRequest.newBuilder()
-                .setTerm(currentTerm)
-                .setLeaderId(nodeId)
-                .setPrevLogIndex(log.isEmpty() ? -1 : log.size())
-                .setPrevLogTerm(currentTerm - 1)
-                .setLeaderCommit(log.size()) // todo индекс записи, до которой данные уже зафиксированы
-                .build();
-
-        internalGrpcActor.onAppendEntityRequest(appendEntriesRequest);
-        scheduledFuture = scheduledExecutor.schedule(
-                this::sendHeartBeats,
-                HEARTBEAT_DELAY_MS + rand.nextLong(1000L, 5000L),
+                this::onTimeout,
+                nextTimeout,
                 TimeUnit.MILLISECONDS
         );
     }
@@ -140,65 +107,168 @@ public class RaftActor {
         }
     }
 
-    public synchronized Raft.VoteResponse onRequestVote(Raft.VoteRequest request) {
-        MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
-        logger.info("Receive new VoteRequest {}", protobufMessageToString(request));
-
-        Raft.VoteResponse.Builder responseBuilder = Raft.VoteResponse.newBuilder();
-
-        // check request term
-        if (request.getTerm() < currentTerm) {
-            logger.info("VoteRequest term is too old.");
-            return responseBuilder
-                    .setTerm(currentTerm)
-                    .setVoteGranted(false)
+    @Override
+    public void onTimeout() {
+        if (leaderId == nodeId) { // send heartbeat
+            PersistentState state = replicatedLogManager.readPersistentState();
+            LogId logId = replicatedLogManager.readLastLogId();
+            Raft.AppendEntriesRequest appendEntriesRequest = Raft.AppendEntriesRequest.newBuilder()
+                    .setTerm(state.currentTerm())
+                    .setLeaderId(nodeId)
+                    .setPrevLogIndex(logId.index())
+                    .setPrevLogTerm(logId.term())
+                    .setLeaderCommit(replicatedLogManager.commitIndex())
                     .build();
-        }
+            internalGrpcActor.sendAppendEntriesRequest(appendEntriesRequest, this::onAppendEntryResult);
+            startTimeout(Timeout.LEADER_HEARTBEAT_PERIOD);
+        } else { // become a follower
+            PersistentState oldState = replicatedLogManager.readPersistentState();
 
-        // check whether node has already voted for another candidate this term
-        boolean isAlreadyVotedForAnother = (votedFor != -1 && votedFor != request.getCandidateId());
+            PersistentState state = new PersistentState(oldState.currentTerm() + 1, nodeId);
+            replicatedLogManager.writePersistentState(state);
+            votedForMe = 0;
+            leaderId = -1;
 
-        // check the relevance of the candidate log
-        LogEntry<MemorySegment> lastLogEntry = log.isEmpty() ? null : log.getLast();
-        boolean isLogUpToDate = (lastLogEntry == null)
-                || (request.getLastLogTerm() > lastLogEntry.term())
-                || (request.getLastLogTerm() == lastLogEntry.term() && request.getLastLogIndex() >= log.size() - 1);
+            startTimeout(Timeout.ELECTION_TIMEOUT);
 
-        // new term or node has not voted for another and their log is up-to-date (voteRequest retry)
-        if (request.getTerm() > currentTerm || !isAlreadyVotedForAnother && isLogUpToDate) {
-            logger.info("VoteRequest has been accepted.");
-            currentTerm = request.getTerm();
-            votedFor = request.getCandidateId();
-            sleepBeforeElections();
-
-            return responseBuilder
-                    .setTerm(currentTerm)
-                    .setVoteGranted(true)
+            LogId lastLogId = replicatedLogManager.readLastLogId();
+            Raft.VoteRequest voteRequest = Raft.VoteRequest.newBuilder()
+                    .setCandidateId(nodeId)
+                    .setTerm(state.currentTerm())
+                    .setLastLogIndex(lastLogId.index())
+                    .setLastLogTerm(lastLogId.term())
                     .build();
-        } else {
-            logger.info("VoteRequest has been rejected.");
-            return responseBuilder
-                    .setTerm(currentTerm)
-                    .setVoteGranted(false)
-                    .build();
+            internalGrpcActor.sendVoteRequest(voteRequest, this::onRequestVoteResult);
         }
     }
 
-    public synchronized void onVoteResponse(Raft.VoteResponse voteResponse) {
+    @Override
+    public void onAppendEntry(Raft.AppendEntriesRequest appendEntriesRequest, Consumer<Raft.AppendEntriesResponse> onVoteResponse) {
+
+    }
+
+    @Override
+    public void onAppendEntryResult(int srcId, Raft.AppendEntriesResponse appendEntriesResponse) {
+        // TODO
+        //     1. readPersistentState
+        //     2. ignore obsolete messages (appendEntriesResponse.getTerm() < state.currentTerm() -> return)
+        //     3. become a follower if  appendEntriesResponse.getTerm() > state.currentTerm() -> update PersistentState
+        //       (leaderId = -1, storage.writePersistentState(PersistentState(message.term))
+        //            env.startTimeout(Timeout.ELECTION_TIMEOUT))
+        //     4.
+
+    }
+
+    public synchronized void onRequestVote(Raft.VoteRequest voteRequest, Consumer<Raft.VoteResponse> onVoteResponse) {
+        MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
+        logger.info("Receive new VoteRequest {}", protobufMessageToString(voteRequest));
+
+        PersistentState state = replicatedLogManager.readPersistentState();
+        // reject old term
+        if (voteRequest.getTerm() < state.currentTerm()) {
+            Raft.VoteResponse voteResponse = Raft.VoteResponse.newBuilder()
+                    .setTerm(state.currentTerm())
+                    .setVoteGranted(false)
+                    .build();
+            onVoteResponse.accept(voteResponse);
+            return;
+        }
+
+        boolean isAlreadyVotedForAnotherInCurrentTerm =
+                state.votedFor() != null
+                        && state.votedFor() != voteRequest.getCandidateId()
+                        && voteRequest.getTerm() == state.currentTerm();
+
+        // reject new leader in the same term
+        if (isAlreadyVotedForAnotherInCurrentTerm) {
+            Raft.VoteResponse voteResponse = Raft.VoteResponse.newBuilder()
+                    .setTerm(state.currentTerm())
+                    .setVoteGranted(false)
+                    .build();
+            onVoteResponse.accept(voteResponse);
+            return;
+        }
+
+        votedForMe = 0;
+        leaderId = -1;
+        if (state.votedFor() == voteRequest.getCandidateId()) {
+            if (state.currentTerm() < voteRequest.getTerm()) {
+                replicatedLogManager.writePersistentState(
+                        new PersistentState(voteRequest.getTerm(), voteRequest.getCandidateId())
+                );
+            }
+            Raft.VoteResponse voteResponse = Raft.VoteResponse.newBuilder()
+                    .setTerm(voteRequest.getTerm())
+                    .setVoteGranted(true)
+                    .build();
+
+            onVoteResponse.accept(voteResponse);
+            return;
+        }
+
+        LogId lastLogId = replicatedLogManager.readLastLogId();
+
+        boolean isLogUpToDate
+                = comparePrevLogs(voteRequest.getLastLogTerm(), voteRequest.getLastLogIndex(), lastLogId) >= 0;
+
+        if (!isLogUpToDate) { // new term, but old log, so we reject vote request and update our term
+            replicatedLogManager.writePersistentState(new PersistentState(voteRequest.getTerm()));
+            Raft.VoteResponse voteResponse = Raft.VoteResponse.newBuilder()
+                    .setTerm(voteRequest.getTerm())
+                    .setVoteGranted(false)
+                    .build();
+            onVoteResponse.accept(voteResponse);
+            startTimeout(Timeout.ELECTION_TIMEOUT);
+            return;
+        }
+
+        replicatedLogManager.writePersistentState(
+                new PersistentState(voteRequest.getTerm(), voteRequest.getCandidateId())
+        );
+        Raft.VoteResponse voteResponse = Raft.VoteResponse.newBuilder()
+                .setTerm(voteRequest.getTerm())
+                .setVoteGranted(true)
+                .build();
+
+        onVoteResponse.accept(voteResponse);
+        startTimeout(Timeout.ELECTION_TIMEOUT);
+    }
+
+    @Override
+    public synchronized void onRequestVoteResult(int srcId, Raft.VoteResponse voteResponse) {
         MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
         logger.info("Receive new VoteResponse {}", protobufMessageToString(voteResponse));
+
+        long currentTerm = replicatedLogManager.readPersistentState().currentTerm();
+        if (voteResponse.getTerm() < currentTerm) return; // ignore obsolete messages
+        if (voteResponse.getTerm() > currentTerm) {
+            leaderId = -1;
+            replicatedLogManager.writePersistentState(new PersistentState(voteResponse.getTerm()));
+            startTimeout(Timeout.ELECTION_TIMEOUT);
+            return;
+        }
         if (voteResponse.getVoteGranted()) {
             votedForMe++;
-            if (votedForMe > quorum(config.getCluster().size())) {
-                amILeader.setPlain(true);
-
-                if (scheduledFuture != null) {
-                    scheduledFuture.cancel(false);
+            if (votedForMe == quorum(config.getCluster().size())) {
+                leaderId = nodeId;
+                votedForMe = 0;
+                onTimeout();
+                while (!queue.isEmpty()) {
+                    onClientCommand(queue.poll());
                 }
-                sendHeartBeats();
             }
         }
         MDC.remove(MDC_NODE_ID);
+    }
+
+    @Override
+    public void onClientCommand(Command command) {
+        // TODO
+    }
+
+    @Override
+    public void onClientCommandResult(CommandResult commandResult) {
+        // TODO
     }
 
     private void appendEntitiesIntoLog(Raft.AppendEntriesRequest request) {
@@ -209,5 +279,10 @@ public class RaftActor {
 
     private static int quorum(final int clusterSize) {
         return clusterSize / 2 + 1;
+    }
+
+    private static int comparePrevLogs(long term, long index, LogId logId) {
+        if (term != logId.term()) return Long.compare(term, logId.term());
+        return Long.compare(index, logId.index());
     }
 }
