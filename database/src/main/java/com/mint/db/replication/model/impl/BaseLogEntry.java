@@ -3,6 +3,7 @@ package com.mint.db.replication.model.impl;
 import com.mint.db.Raft;
 import com.mint.db.dao.Entry;
 import com.mint.db.dao.impl.BaseEntry;
+import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.model.LogEntry;
 
@@ -24,5 +25,11 @@ public record BaseLogEntry<D>(
     @Override
     public String toString() {
         return STR."{ operationType=\{operationType}, entry=\{entry}, logId=\{logId} }";
+    }
+
+    @Override
+    public Command getCommand() {
+        // TODO implement
+        return null;
     }
 }

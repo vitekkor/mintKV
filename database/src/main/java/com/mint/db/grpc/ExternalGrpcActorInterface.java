@@ -19,14 +19,12 @@ public interface ExternalGrpcActorInterface {
     );
 
     /**
-     * Sends the {@code command} message to the process {@code destId} (from 1 to [nProcesses]).
-     * Calls {@code onCommandResult} on result.
+     * Sends the {@code commandResult} to the client.
      *
-     * @param onCommandResult int srcId, CommandResult onCommandResult
+     * @param commandResult result of applying client command
      */
     void onClientCommandResult(
-            int destId,
             Command command,
-            BiConsumer<Integer, CommandResult> onCommandResult
+            CommandResult commandResult
     );
 }
