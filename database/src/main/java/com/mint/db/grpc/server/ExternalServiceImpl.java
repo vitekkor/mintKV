@@ -3,10 +3,12 @@ package com.mint.db.grpc.server;
 import com.mint.DatabaseServiceGrpc;
 import com.mint.DatabaseServiceOuterClass;
 import com.mint.db.grpc.ExternalGrpcActorInterface;
+import com.mint.db.grpc.client.ExternalGrpcClient;
 import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
 import io.grpc.stub.StreamObserver;
 
+import java.util.Map;
 import java.util.function.BiConsumer;
 
 public class ExternalServiceImpl
@@ -14,6 +16,12 @@ public class ExternalServiceImpl
         implements ExternalGrpcActorInterface {
     // TODO
     //     private final Map<Command, StreamObserver<?>> commandStreamObserverMap;
+    private final Map<String, ExternalGrpcClient> externalGrpcClients;
+
+    public ExternalServiceImpl(Map<String, ExternalGrpcClient> externalGrpcClients) {
+        this.externalGrpcClients = externalGrpcClients;
+    }
+
     @Override
     public void insert(
             DatabaseServiceOuterClass.InsertRequest request,

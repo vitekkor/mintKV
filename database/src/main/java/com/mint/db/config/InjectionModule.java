@@ -8,10 +8,14 @@ import com.mint.db.config.annotations.InternalGrpcActorBean;
 import com.mint.db.config.annotations.NodeConfiguration;
 import com.mint.db.config.annotations.PersistentStateBean;
 import com.mint.db.config.annotations.RaftActorBean;
+import com.mint.db.grpc.ExternalGrpcActorInterface;
 import com.mint.db.grpc.InternalGrpcActor;
+import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.grpc.client.ExternalGrpcClient;
 import com.mint.db.grpc.client.InternalGrpcClient;
+import com.mint.db.grpc.server.ExternalServiceImpl;
 import com.mint.db.raft.RaftActor;
+import com.mint.db.raft.RaftActorInterface;
 import com.mint.db.replication.model.PersistentState;
 
 import java.io.FileNotFoundException;
@@ -34,15 +38,23 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @InternalGrpcActorBean
-    static InternalGrpcActor provideInternalGrpcActor(
+    static InternalGrpcActorInterface provideInternalGrpcActorInterface(
             @InternalClientsBean Map<String, InternalGrpcClient> internalGrpcClients
     ) {
         return new InternalGrpcActor(internalGrpcClients);
     }
 
     @Provides
+    @InternalGrpcActorBean
+    static ExternalGrpcActorInterface provideExternalGrpcActorInterface(
+            @ExternalClientsBean Map<String, ExternalGrpcClient> externalGrpcClients
+    ) {
+        return new ExternalServiceImpl(externalGrpcClients);
+    }
+
+    @Provides
     @RaftActorBean
-    static RaftActor provideRaftActor(
+    static RaftActorInterface provideRaftActorInterface(
             @InternalGrpcActorBean InternalGrpcActor internalGrpcActor,
             @NodeConfiguration NodeConfig nodeConfig,
             @PersistentStateBean PersistentState persistentState

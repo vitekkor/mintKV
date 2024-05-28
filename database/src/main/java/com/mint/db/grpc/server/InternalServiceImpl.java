@@ -4,10 +4,11 @@ import com.google.inject.Inject;
 import com.mint.db.Raft;
 import com.mint.db.RaftServiceGrpc;
 import com.mint.db.raft.RaftActor;
+import com.mint.db.raft.RaftActorInterface;
 import io.grpc.stub.StreamObserver;
 
 public class InternalServiceImpl extends RaftServiceGrpc.RaftServiceImplBase {
-    private final RaftActor raftActor;
+    private final RaftActorInterface raftActor;
 
     @Inject
     public InternalServiceImpl(RaftActor raftActor) {

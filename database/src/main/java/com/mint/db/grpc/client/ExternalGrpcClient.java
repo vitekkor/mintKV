@@ -22,6 +22,7 @@ public class ExternalGrpcClient implements Closeable {
     public ExternalGrpcClient(String url) {
         channel = Grpc.newChannelBuilder(url, InsecureChannelCredentials.create())
                 .build();
+        // TODO use async stub
         blockingStub = DatabaseServiceGrpc.newBlockingStub(channel);
     }
 

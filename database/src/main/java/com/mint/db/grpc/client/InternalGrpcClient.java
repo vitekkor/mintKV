@@ -22,6 +22,7 @@ public class InternalGrpcClient implements Closeable {
     public InternalGrpcClient(String url) {
         channel = Grpc.newChannelBuilder(url, InsecureChannelCredentials.create())
                 .build();
+        // TODO use async stub
         blockingStub = RaftServiceGrpc.newBlockingStub(channel);
     }
 
