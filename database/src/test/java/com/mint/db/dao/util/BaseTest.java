@@ -41,6 +41,11 @@ public class BaseTest {
         }
     }
 
+    public void assertNull(Entry<String> entry) {
+        checkInterrupted();
+        Assertions.assertNull(entry);
+    }
+
     public void assertEmpty(Iterator<?> iterator) {
         checkInterrupted();
         Assertions.assertIterableEquals(Collections.emptyList(), list(iterator));
@@ -49,11 +54,6 @@ public class BaseTest {
     public void assertSame(Entry<String> entry, Entry<String> expected) {
         checkInterrupted();
         Assertions.assertEquals(expected, entry);
-    }
-
-    public void assertNull(Entry<String> entry) {
-        checkInterrupted();
-        Assertions.assertNull(entry);
     }
 
     public void assertSame(Iterator<? extends Entry<String>> iterator, Entry<?>... expected) {
@@ -65,14 +65,20 @@ public class BaseTest {
         for (Entry<?> entry : expected) {
             checkInterrupted();
             if (!iterator.hasNext()) {
-                throw new AssertionFailedError("No more entries in iterator: " + index + " from " + expected.size() + " entries iterated");
+                throw new AssertionFailedError(
+                        "No more entries in iterator: " + index + " from " + expected.size() + " entries iterated"
+                );
             }
             int finalIndex = index;
-            Assertions.assertEquals(entry, iterator.next(), () -> "wrong entry at index " + finalIndex + " from " + expected.size());
+            Assertions.assertEquals(
+                    entry, iterator.next(), () -> "wrong entry at index " + finalIndex + " from " + expected.size()
+            );
             index++;
         }
         if (iterator.hasNext()) {
-            throw new AssertionFailedError("Unexpected entry at index " + index + " from " + expected.size() + " elements: " + iterator.next());
+            throw new AssertionFailedError(
+                    "Unexpected entry at index " + index + " from " + expected.size() + " elements: " + iterator.next()
+            );
         }
     }
 
@@ -124,13 +130,13 @@ public class BaseTest {
         return keyAt("k", index);
     }
 
-    public String valueAt(int index) {
-        return valueAt("v", index);
-    }
-
     public String keyAt(String prefix, int index) {
         String paddedIdx = String.format("%010d", index);
         return prefix + paddedIdx;
+    }
+
+    public String valueAt(int index) {
+        return valueAt("v", index);
     }
 
     public String valueAt(String prefix, int index) {
