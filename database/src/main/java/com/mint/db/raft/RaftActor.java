@@ -22,6 +22,7 @@ import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Random;
 import java.util.concurrent.Executors;
@@ -70,6 +71,9 @@ public class RaftActor implements RaftActorInterface {
                     : nodeId * heartbeatTimeoutMs / nProcesses;
             case LEADER_HEARTBEAT_PERIOD -> 0;
         };
+        MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
+        logger.info("nextTimeout {}", nextTimeout);
+        MDC.remove(MDC_NODE_ID);
 
         if (scheduledFuture != null) {
             scheduledFuture.cancel(false);
@@ -191,7 +195,7 @@ public class RaftActor implements RaftActorInterface {
 
         votedForMe = 0;
         leaderId = -1;
-        if (state.votedFor() == voteRequest.getCandidateId()) {
+        if (Objects.equals(state.votedFor(), voteRequest.getCandidateId())) {
             if (state.currentTerm() < voteRequest.getTerm()) {
                 replicatedLogManager.writePersistentState(
                         new PersistentState(voteRequest.getTerm(), voteRequest.getCandidateId())

@@ -69,6 +69,6 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
         Entry<MemorySegment> delegateEntry
                 = new BaseEntry<>(toMemorySegment(entry.key()), toMemorySegment(entry.value()));
         Entry<MemorySegment> oldEntry = delegate.upsert(delegateEntry);
-        return new BaseEntry<>(toString(oldEntry.key()), toString(oldEntry.value()));
+        return oldEntry != null ? new BaseEntry<>(toString(oldEntry.key()), toString(oldEntry.value())) : null;
     }
 }

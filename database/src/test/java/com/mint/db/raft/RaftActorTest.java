@@ -11,7 +11,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
 import org.powermock.modules.junit4.PowerMockRunner;
-import org.powermock.reflect.Whitebox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,7 +19,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -38,7 +36,7 @@ class RaftActorTest {
                 8080,
                 0,
                 logDir.toString(),
-                5000,
+                5000L,
                 List.of(
                         "http://localhost:8080",
                         "http://localhost:8081",
@@ -81,11 +79,6 @@ class RaftActorTest {
             nodeConfig.setPort(8080 + i);
             Mockito.when(nodeConfig.heartbeatRandom()).thenReturn(false);
 
-
-            Random random = Mockito.mock(Random.class);
-            Mockito.when(random.nextLong(1000L, 5000L)).thenReturn((i + 1) * 5000L);
-            Whitebox.setInternalState(RaftActor.class, "rand", random);
-
             RaftActor raftActor = new RaftActor(internalGrpcActor, nodeConfig, new PersistentState());
             cluster.add(raftActor);
         }
@@ -102,7 +95,7 @@ class RaftActorTest {
                         ComparatorMatcherBuilder.comparedBy(Integer::compareTo).comparesEqualTo(1)
                 );
         Mockito.verify(internalGrpcActor, Mockito.times(1))
-                .onAppendEntityRequest(Mockito.any(Raft.AppendEntriesRequest.class));
+                .sendAppendEntriesRequest(Mockito.any(Raft.AppendEntriesRequest.class), Mockito.any());
         //CHECKSTYLE.ON: IndentationCheck
     }
 }

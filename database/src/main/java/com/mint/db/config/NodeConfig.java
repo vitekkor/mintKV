@@ -57,6 +57,10 @@ public final class NodeConfig {
         return new NodeConfig(port, nodeId, logDir, heartbeatTimeoutMs, cluster);
     }
 
+    public void setHeartbeatTimeoutMs(long heartbeatTimeoutMs) {
+        this.heartbeatTimeoutMs = heartbeatTimeoutMs;
+    }
+
     public long getHeartbeatTimeoutMs() {
         return heartbeatTimeoutMs;
     }

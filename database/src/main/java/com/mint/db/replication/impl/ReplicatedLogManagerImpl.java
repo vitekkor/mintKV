@@ -72,7 +72,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
 
     @Override
     public LogId readLastLogId() {
-        throw new RuntimeException("Not implemented"); // TODO
+       return new LogId(0, 0); // TODO
     }
 
     @Override
