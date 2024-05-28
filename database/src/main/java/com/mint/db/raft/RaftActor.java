@@ -64,16 +64,14 @@ public class RaftActor implements RaftActorInterface {
 
     private void startTimeout(Timeout timeout) {
         long heartbeatTimeoutMs = config.getHeartbeatTimeoutMs();
-        int nProcesses = config.getCluster().size();
+        int numberOfProcesses = config.getCluster().size();
         this.nextTimeout = heartbeatTimeoutMs + switch (timeout) {
-            case ELECTION_TIMEOUT -> config.heartbeatRandom() ?
-                    rand.nextLong(heartbeatTimeoutMs / nProcesses, heartbeatTimeoutMs)
-                    : nodeId * heartbeatTimeoutMs / nProcesses;
+            case ELECTION_TIMEOUT -> config.heartbeatRandom()
+                    ? rand.nextLong(heartbeatTimeoutMs / numberOfProcesses, heartbeatTimeoutMs)
+                    : nodeId * heartbeatTimeoutMs / numberOfProcesses;
             case LEADER_HEARTBEAT_PERIOD -> 0;
+            case null -> throw new IllegalArgumentException();
         };
-        MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
-        logger.info("nextTimeout {}", nextTimeout);
-        MDC.remove(MDC_NODE_ID);
 
         if (scheduledFuture != null) {
             scheduledFuture.cancel(false);
@@ -147,7 +145,10 @@ public class RaftActor implements RaftActorInterface {
     }
 
     @Override
-    public void onAppendEntry(Raft.AppendEntriesRequest appendEntriesRequest, Consumer<Raft.AppendEntriesResponse> onVoteResponse) {
+    public void onAppendEntry(
+            Raft.AppendEntriesRequest appendEntriesRequest,
+            Consumer<Raft.AppendEntriesResponse> onVoteResponse
+    ) {
 
     }
 
@@ -244,7 +245,10 @@ public class RaftActor implements RaftActorInterface {
         logger.info("Receive new VoteResponse {}", protobufMessageToString(voteResponse));
 
         long currentTerm = replicatedLogManager.readPersistentState().currentTerm();
-        if (voteResponse.getTerm() < currentTerm) return; // ignore obsolete messages
+        if (voteResponse.getTerm() < currentTerm) {
+            return; // ignore obsolete messages
+        }
+
         if (voteResponse.getTerm() > currentTerm) {
             leaderId = -1;
             replicatedLogManager.writePersistentState(new PersistentState(voteResponse.getTerm()));
@@ -286,7 +290,9 @@ public class RaftActor implements RaftActorInterface {
     }
 
     private static int comparePrevLogs(long term, long index, LogId logId) {
-        if (term != logId.term()) return Long.compare(term, logId.term());
+        if (term != logId.term()) {
+            return Long.compare(term, logId.term());
+        }
         return Long.compare(index, logId.index());
     }
 }

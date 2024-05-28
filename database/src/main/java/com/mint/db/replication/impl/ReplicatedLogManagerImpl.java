@@ -72,7 +72,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
 
     @Override
     public LogId readLastLogId() {
-       return new LogId(0, 0); // TODO
+        return new LogId(0, 0); // TODO
     }
 
     @Override

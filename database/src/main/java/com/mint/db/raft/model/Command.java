@@ -9,14 +9,14 @@ public sealed interface Command permits GetCommand, InsertCommand {
     long processId();
 
     /**
-     * Key
+     * Key.
      *
      * @return entry key
      */
     String key();
 
     /**
-     * Value. null if it {@link GetCommand} or {@link InsertCommand} and it is a delete request
+     * Value. null if it {@link GetCommand} or {@link InsertCommand} and it is a delete request.
      *
      * @return entry value
      */

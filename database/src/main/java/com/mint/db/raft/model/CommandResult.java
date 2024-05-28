@@ -7,14 +7,14 @@ public sealed interface CommandResult permits GetCommandResult, InsertCommandRes
     long term();
 
     /**
-     * Key
+     * Key.
      *
      * @return entry key
      */
     String key();
 
     /**
-     * Value. null if it {@link InsertCommand}
+     * Value. null if it {@link InsertCommand}.
      *
      * @return entry value
      */

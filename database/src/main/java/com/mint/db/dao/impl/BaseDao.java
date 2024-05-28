@@ -19,11 +19,6 @@ public class BaseDao implements Dao<MemorySegment, Entry<MemorySegment>> {
     }
 
     @Override
-    public Entry<MemorySegment> upsert(Entry<MemorySegment> entry) {
-        return delegate.put(entry.key(), entry);
-    }
-
-    @Override
     public Iterator<Entry<MemorySegment>> get(MemorySegment from, MemorySegment to) {
         if (from == null && to == null) {
             return delegate.values().iterator();
@@ -33,5 +28,10 @@ public class BaseDao implements Dao<MemorySegment, Entry<MemorySegment>> {
             return delegate.headMap(to).values().iterator();
         }
         return delegate.subMap(from, to).values().iterator();
+    }
+
+    @Override
+    public Entry<MemorySegment> upsert(Entry<MemorySegment> entry) {
+        return delegate.put(entry.key(), entry);
     }
 }

@@ -13,7 +13,7 @@ public interface LogEntry<D> {
     LogId logId();
 
     /**
-     * Converts entry to {@link Command} interface
+     * Converts entry to {@link Command} interface.
      *
      * @return {@link Command}
      */
