@@ -20,6 +20,7 @@ public class ExternalGrpcClient implements Closeable {
     private final DatabaseServiceGrpc.DatabaseServiceBlockingStub blockingStub;
 
     public ExternalGrpcClient(String url) {
+        // TODO connect after server starts
         channel = Grpc.newChannelBuilder(url, InsecureChannelCredentials.create())
                 .build();
         // TODO use async stub

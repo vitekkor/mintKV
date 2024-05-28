@@ -11,7 +11,7 @@ public class InternalServiceImpl extends RaftServiceGrpc.RaftServiceImplBase {
     private final RaftActorInterface raftActor;
 
     @Inject
-    public InternalServiceImpl(RaftActor raftActor) {
+    public InternalServiceImpl(RaftActorInterface raftActor) {
         this.raftActor = raftActor;
     }
 

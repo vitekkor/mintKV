@@ -2,10 +2,12 @@ package com.mint.db.grpc.server;
 
 import com.google.inject.Inject;
 import com.mint.db.config.NodeConfig;
+import com.mint.db.config.annotations.ExternalGrpcActorBean;
 import com.mint.db.config.annotations.NodeConfiguration;
 import com.mint.db.config.annotations.RaftActorBean;
 import com.mint.db.exceptions.ServerStartupException;
 import com.mint.db.raft.RaftActor;
+import com.mint.db.raft.RaftActorInterface;
 import io.grpc.ServerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,10 +20,14 @@ public class Server {
     private final io.grpc.Server grpcServer;
 
     @Inject
-    public Server(@NodeConfiguration NodeConfig config, @RaftActorBean RaftActor raftActor) {
+    public Server(
+            @NodeConfiguration NodeConfig config,
+            @RaftActorBean RaftActorInterface raftActor,
+            @ExternalGrpcActorBean ExternalServiceImpl externalService
+    ) {
         this.grpcServer = ServerBuilder
                 .forPort(config.getPort())
-                .addService(new ExternalServiceImpl())
+                .addService(externalService)
                 .addService(new InternalServiceImpl(raftActor))
                 .build();
     }

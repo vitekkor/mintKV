@@ -3,6 +3,7 @@ package com.mint.db.raft;
 import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.grpc.InternalGrpcActor;
+import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
 import com.mint.db.raft.model.LogId;
@@ -40,7 +41,7 @@ public class RaftActor implements RaftActorInterface {
     private static final int POOL_SIZE = 1;
     public static final String MDC_NODE_ID = "nodeId";
 
-    private final InternalGrpcActor internalGrpcActor;
+    private final InternalGrpcActorInterface internalGrpcActor;
     private final int nodeId;
     private final ScheduledExecutorService scheduledExecutor;
     private ScheduledFuture<?> scheduledFuture;
@@ -52,7 +53,7 @@ public class RaftActor implements RaftActorInterface {
     private final Queue<Command> queue = new ArrayDeque<>();
     private long nextTimeout = Long.MAX_VALUE;
 
-    public RaftActor(InternalGrpcActor internalGrpcActor, NodeConfig config, PersistentState state) {
+    public RaftActor(InternalGrpcActorInterface internalGrpcActor, NodeConfig config, PersistentState state) {
         this.scheduledExecutor = Executors.newScheduledThreadPool(POOL_SIZE);
         this.replicatedLogManager = new ReplicatedLogManagerImpl(config, state);
         this.config = config;
@@ -64,7 +65,7 @@ public class RaftActor implements RaftActorInterface {
 
     private void startTimeout(Timeout timeout) {
         long heartbeatTimeoutMs = config.getHeartbeatTimeoutMs();
-        int numberOfProcesses = config.getCluster().size();
+        int numberOfProcesses = Math.max(config.getCluster().size(), 2);
         this.nextTimeout = heartbeatTimeoutMs + switch (timeout) {
             case ELECTION_TIMEOUT -> config.heartbeatRandom()
                     ? rand.nextLong(heartbeatTimeoutMs / numberOfProcesses, heartbeatTimeoutMs)

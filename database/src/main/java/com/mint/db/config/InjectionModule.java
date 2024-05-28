@@ -3,12 +3,12 @@ package com.mint.db.config;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.mint.db.config.annotations.ExternalClientsBean;
+import com.mint.db.config.annotations.ExternalGrpcActorBean;
 import com.mint.db.config.annotations.InternalClientsBean;
 import com.mint.db.config.annotations.InternalGrpcActorBean;
 import com.mint.db.config.annotations.NodeConfiguration;
 import com.mint.db.config.annotations.PersistentStateBean;
 import com.mint.db.config.annotations.RaftActorBean;
-import com.mint.db.grpc.ExternalGrpcActorInterface;
 import com.mint.db.grpc.InternalGrpcActor;
 import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.grpc.client.ExternalGrpcClient;
@@ -24,7 +24,7 @@ import java.util.Map;
 
 public class InjectionModule extends AbstractModule {
     @Provides
-    @NodeConfiguration
+    @PersistentStateBean
     static PersistentState provicePersistentState() {
         // TODO READ FROM FILE
         return new PersistentState();
@@ -45,17 +45,18 @@ public class InjectionModule extends AbstractModule {
     }
 
     @Provides
-    @InternalGrpcActorBean
-    static ExternalGrpcActorInterface provideExternalGrpcActorInterface(
+    @ExternalGrpcActorBean
+    static ExternalServiceImpl provideExternalGrpcActorInterface(
             @ExternalClientsBean Map<String, ExternalGrpcClient> externalGrpcClients
     ) {
         return new ExternalServiceImpl(externalGrpcClients);
     }
 
+
     @Provides
     @RaftActorBean
     static RaftActorInterface provideRaftActorInterface(
-            @InternalGrpcActorBean InternalGrpcActor internalGrpcActor,
+            @InternalGrpcActorBean InternalGrpcActorInterface internalGrpcActor,
             @NodeConfiguration NodeConfig nodeConfig,
             @PersistentStateBean PersistentState persistentState
     ) {
