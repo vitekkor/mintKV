@@ -3,6 +3,7 @@ package com.mint.db.raft;
 import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.grpc.InternalGrpcActor;
+import com.mint.db.replication.model.PersistentState;
 import org.awaitility.Awaitility;
 import org.hamcrest.comparator.ComparatorMatcherBuilder;
 import org.junit.jupiter.api.Assertions;
@@ -78,7 +79,7 @@ class RaftActorTest {
             Mockito.when(random.nextLong(1000L, 5000L)).thenReturn((i + 1) * 5000L);
             Whitebox.setInternalState(RaftActor.class, "rand", random);
 
-            RaftActor raftActor = new RaftActor(internalGrpcActor, nodeConfig);
+            RaftActor raftActor = new RaftActor(internalGrpcActor, nodeConfig, new PersistentState());
             cluster.add(raftActor);
         }
         //CHECKSTYLE.OFF: IndentationCheck

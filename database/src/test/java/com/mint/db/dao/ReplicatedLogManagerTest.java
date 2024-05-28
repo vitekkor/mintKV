@@ -3,8 +3,10 @@ package com.mint.db.dao;
 import com.mint.db.config.ConfigParser;
 import com.mint.db.dao.impl.BaseEntry;
 import com.mint.db.dao.impl.StringDaoWrapper;
+import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
 import com.mint.db.replication.model.LogEntry;
+import com.mint.db.replication.model.PersistentState;
 import com.mint.db.replication.model.impl.BaseLogEntry;
 import com.mint.db.replication.model.impl.OperationType;
 import org.junit.jupiter.api.DisplayName;
@@ -25,11 +27,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class ReplicatedLogManagerTest {
+    private static ReplicatedLogManagerImpl createReplicatedLogManager() throws IOException {
+        return new ReplicatedLogManagerImpl(ConfigParser.parseConfig(), new PersistentState());
+    }
 
     @Test
     @DisplayName("Test append log entry")
     public void testAppendLogEntry() throws IOException {
-        ReplicatedLogManagerImpl logManager = new ReplicatedLogManagerImpl(ConfigParser.parseConfig());
+        ReplicatedLogManagerImpl logManager = createReplicatedLogManager();
         LogEntry<MemorySegment> logEntry = createLogEntry(
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
@@ -43,7 +48,8 @@ public class ReplicatedLogManagerTest {
                 FileChannel fileChannel = FileChannel.open(
                         logFile,
                         StandardOpenOption.READ
-                )
+                );
+                logManager
         ) {
             LogEntry<MemorySegment> deserializedLogEntry = deserializeLogEntry(fileChannel, logFile);
             checkLogEntry(logEntry, deserializedLogEntry);
@@ -53,7 +59,7 @@ public class ReplicatedLogManagerTest {
     @Test
     @DisplayName("Test with null value")
     public void testAppendLogEntryWithNullValue() throws IOException {
-        ReplicatedLogManagerImpl logManager = new ReplicatedLogManagerImpl(ConfigParser.parseConfig());
+        ReplicatedLogManagerImpl logManager = createReplicatedLogManager();
         LogEntry<MemorySegment> logEntry = createLogEntry(
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
@@ -67,7 +73,8 @@ public class ReplicatedLogManagerTest {
                 FileChannel fileChannel = FileChannel.open(
                         logFile,
                         StandardOpenOption.READ
-                )
+                );
+                logManager
         ) {
             LogEntry<MemorySegment> deserializedLogEntry = deserializeLogEntry(fileChannel, logFile);
             assertEquals(logEntry.operationType(), deserializedLogEntry.operationType());
@@ -77,7 +84,7 @@ public class ReplicatedLogManagerTest {
     @Test
     @DisplayName("Test with 2 values")
     public void testAppendLogEntryWithTwoValues() throws IOException {
-        ReplicatedLogManagerImpl logManager = new ReplicatedLogManagerImpl(ConfigParser.parseConfig());
+        ReplicatedLogManagerImpl logManager = createReplicatedLogManager();
         LogEntry<MemorySegment> logEntry = createLogEntry(
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
@@ -99,7 +106,8 @@ public class ReplicatedLogManagerTest {
                 FileChannel fileChannel = FileChannel.open(
                         logFile,
                         StandardOpenOption.READ
-                )
+                );
+                logManager
         ) {
             List<LogEntry<MemorySegment>> deserializedLogEntries = deserializeLogEntries(fileChannel, logFile);
             checkLogEntry(logEntry, deserializedLogEntries.get(0));
@@ -133,23 +141,22 @@ public class ReplicatedLogManagerTest {
                 value = ms.asSlice(offset, valueSize);
                 offset += valueSize;
             }
-            long timestamp = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
+            long index = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
             offset += Long.BYTES;
             long term = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
             offset += Long.BYTES;
-            logEntries.add(createLogEntry(OperationType.fromLong(operationType), key, value, timestamp, term));
+            logEntries.add(createLogEntry(OperationType.fromLong(operationType), key, value, index, term));
         }
         return logEntries;
         //CHECKSTYLE.ON
     }
 
     private LogEntry<MemorySegment> createLogEntry(
-            OperationType operationType, MemorySegment key, MemorySegment value, long timestamp, long term) {
+            OperationType operationType, MemorySegment key, MemorySegment value, long index, long term) {
         return new BaseLogEntry<>(
                 operationType,
                 new BaseEntry<>(key, value),
-                timestamp,
-                term
+                new LogId(index, term)
         );
     }
 
@@ -161,6 +168,6 @@ public class ReplicatedLogManagerTest {
         } else {
             assertEquals(expected.entry().value().byteSize(), actual.entry().value().byteSize());
         }
-        assertEquals(expected.timestamp(), actual.timestamp());
+        assertEquals(expected.logId(), actual.logId());
     }
 }

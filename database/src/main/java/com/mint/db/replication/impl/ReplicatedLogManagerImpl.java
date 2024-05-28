@@ -1,8 +1,10 @@
 package com.mint.db.replication.impl;
 
 import com.mint.db.config.NodeConfig;
+import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.model.LogEntry;
+import com.mint.db.replication.model.PersistentState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,8 +31,11 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private final ByteArraySegment longBuffer = new ByteArraySegment(Long.BYTES);
     private final ByteArraySegment blobBuffer = new ByteArraySegment(BLOB_BUFFER_SIZE);
 
-    public ReplicatedLogManagerImpl(NodeConfig nodeConfig) {
+    private PersistentState state;
+
+    public ReplicatedLogManagerImpl(NodeConfig nodeConfig, PersistentState state) {
         this.nodeConfig = nodeConfig;
+        this.state = state;
         logFile = createLogFile();
         try {
             outputStream = new BufferedOutputStream(
@@ -40,6 +45,17 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         } catch (IOException e) {
             throw new RuntimeException("Failed to open log file", e);
         }
+    }
+
+    @Override
+    public PersistentState readPersistentState() {
+        return state;
+    }
+
+    @Override
+    public void writePersistentState(PersistentState state) {
+        // TODO SAVE IN FILE
+        this.state = state;
     }
 
     @Override
@@ -53,6 +69,16 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         }
     }
 
+    @Override
+    public LogId readLastLogId() {
+        throw new RuntimeException("Not implemented"); // TODO
+    }
+
+    @Override
+    public LogEntry<MemorySegment> readLog(long index) {
+        throw new RuntimeException("Not implemented"); // TODO
+    }
+
     private void serializeLogEntry(LogEntry<MemorySegment> logEntry) throws IOException {
         writeLong(logEntry.operationType().getValue(), outputStream);
         writeLong(logEntry.entry().key().byteSize(), outputStream);
@@ -63,8 +89,8 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         } else {
             writeLong(-1, outputStream);
         }
-        writeLong(logEntry.timestamp(), outputStream);
-        writeLong(logEntry.term(), outputStream);
+        writeLong(logEntry.logId().index(), outputStream);
+        writeLong(logEntry.logId().term(), outputStream);
     }
 
     private void writeLong(

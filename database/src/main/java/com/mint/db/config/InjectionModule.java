@@ -6,17 +6,25 @@ import com.mint.db.config.annotations.ExternalClientsBean;
 import com.mint.db.config.annotations.InternalClientsBean;
 import com.mint.db.config.annotations.InternalGrpcActorBean;
 import com.mint.db.config.annotations.NodeConfiguration;
+import com.mint.db.config.annotations.PersistentStateBean;
 import com.mint.db.config.annotations.RaftActorBean;
 import com.mint.db.grpc.InternalGrpcActor;
 import com.mint.db.grpc.client.ExternalGrpcClient;
 import com.mint.db.grpc.client.InternalGrpcClient;
 import com.mint.db.raft.RaftActor;
+import com.mint.db.replication.model.PersistentState;
 
 import java.io.FileNotFoundException;
 import java.util.HashMap;
 import java.util.Map;
 
 public class InjectionModule extends AbstractModule {
+    @Provides
+    @NodeConfiguration
+    static PersistentState provicePersistentState() {
+        // TODO READ FROM FILE
+        return new PersistentState();
+    }
 
     @Provides
     @NodeConfiguration
@@ -36,9 +44,10 @@ public class InjectionModule extends AbstractModule {
     @RaftActorBean
     static RaftActor provideRaftActor(
             @InternalGrpcActorBean InternalGrpcActor internalGrpcActor,
-            @NodeConfiguration NodeConfig nodeConfig
+            @NodeConfiguration NodeConfig nodeConfig,
+            @PersistentStateBean PersistentState persistentState
     ) {
-        return new RaftActor(internalGrpcActor, nodeConfig);
+        return new RaftActor(internalGrpcActor, nodeConfig, persistentState);
     }
 
     @Provides

@@ -7,6 +7,7 @@ import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
 import com.mint.db.replication.model.LogEntry;
 import com.mint.db.replication.model.Message;
+import com.mint.db.replication.model.PersistentState;
 import com.mint.db.replication.model.impl.BaseLogEntry;
 import com.mint.db.replication.model.impl.FollowerMessage;
 import com.mint.db.replication.model.impl.LeaderMessage;
@@ -48,9 +49,9 @@ public class RaftActor {
     private long votedFor = -1;
     private int votedForMe = 0;
 
-    public RaftActor(InternalGrpcActor internalGrpcActor, NodeConfig config) {
+    public RaftActor(InternalGrpcActor internalGrpcActor, NodeConfig config, PersistentState state) {
         this.scheduledExecutor = Executors.newScheduledThreadPool(POOL_SIZE);
-        this.replicatedLogManager = new ReplicatedLogManagerImpl(config);
+        this.replicatedLogManager = new ReplicatedLogManagerImpl(config, state);
         this.config = config;
         this.internalGrpcActor = internalGrpcActor;
         this.nodeId = config.getNodeId();
