@@ -41,7 +41,8 @@ message AppendEntriesRequest {
 
 message AppendEntriesResponse {
   int64 term = 1;
-  bool success = 2;
+  /** If success, then `entry.id.index ?: prevLogId.id.index`; `-1` when not successful. **/
+  int64 lastIndex = 2;
 }
 
 

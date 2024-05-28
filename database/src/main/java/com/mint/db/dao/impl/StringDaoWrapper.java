@@ -29,6 +29,13 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
         return MemorySegment.ofArray(string.getBytes(StandardCharsets.UTF_8));
     }
 
+    public static MemorySegment toMemorySegment(byte[] bytes) {
+        if (bytes == null) {
+            return null;
+        }
+        return MemorySegment.ofArray(bytes);
+    }
+
     @Override
     public Entry<String> get(String key) {
         Entry<MemorySegment> entry = delegate.get(toMemorySegment(key));
