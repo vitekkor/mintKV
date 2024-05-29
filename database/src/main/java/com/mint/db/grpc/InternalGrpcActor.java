@@ -13,14 +13,6 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
         this.internalGrpcClients = internalGrpcClients;
     }
 
-    public void onLeaderCandidate(Raft.VoteRequest voteRequest) {
-        // TODO send vote request to cluster nodes
-    }
-
-    public void onAppendEntityRequest(Raft.AppendEntriesRequest appendEntriesRequest) {
-        // TODO send appendEntriesRequest to cluster nodes
-    }
-
     @Override
     public void sendVoteRequest(
             Raft.VoteRequest voteRequest,
