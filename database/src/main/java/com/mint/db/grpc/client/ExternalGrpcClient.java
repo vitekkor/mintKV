@@ -34,7 +34,10 @@ public class ExternalGrpcClient implements Closeable {
         stub = DatabaseServiceGrpc.newStub(channel);
     }
 
-    public void get(DatabaseServiceOuterClass.GetRequest getRequest, TsiFrameProtector.Consumer<DatabaseServiceOuterClass.GetResponse> onGetResult) {
+    public void get(
+            DatabaseServiceOuterClass.GetRequest getRequest,
+            TsiFrameProtector.Consumer<DatabaseServiceOuterClass.GetResponse> onGetResult
+    ) {
         logger.debug("Get request {}", LogUtil.protobufMessageToString(getRequest));
         stub.get(getRequest, new StreamObserver<>() {
             @Override
@@ -54,7 +57,10 @@ public class ExternalGrpcClient implements Closeable {
         });
     }
 
-    public void insert(DatabaseServiceOuterClass.InsertRequest insertRequest, TsiFrameProtector.Consumer<DatabaseServiceOuterClass.SuccessfulWriteResponse> onInsertResult) {
+    public void insert(
+            DatabaseServiceOuterClass.InsertRequest insertRequest,
+            TsiFrameProtector.Consumer<DatabaseServiceOuterClass.SuccessfulWriteResponse> onInsertResult
+    ) {
         logger.debug("Insert request {}", LogUtil.protobufMessageToString(insertRequest));
         stub.insert(insertRequest, new StreamObserver<>() {
             @Override
@@ -74,7 +80,10 @@ public class ExternalGrpcClient implements Closeable {
         });
     }
 
-    public void delete(DatabaseServiceOuterClass.DeleteRequest deleteRequest, TsiFrameProtector.Consumer<DatabaseServiceOuterClass.SuccessfulWriteResponse> onDeleteResult) {
+    public void delete(
+            DatabaseServiceOuterClass.DeleteRequest deleteRequest,
+            TsiFrameProtector.Consumer<DatabaseServiceOuterClass.SuccessfulWriteResponse> onDeleteResult
+    ) {
         logger.debug("Delete request {}", LogUtil.protobufMessageToString(deleteRequest));
         stub.delete(deleteRequest, new StreamObserver<>() {
             @Override

@@ -49,7 +49,8 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
 
     @Override
     public void sendAppendEntriesRequest(
-            int destId, Raft.AppendEntriesRequest appendEntriesRequest,
+            int destId,
+            Raft.AppendEntriesRequest appendEntriesRequest,
             BiConsumer<Integer, Raft.AppendEntriesResponse> onAppendEntryResult
     ) {
         String key = String.valueOf(destId);

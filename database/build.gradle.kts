@@ -21,7 +21,7 @@ dependencies {
     implementation("io.grpc:grpc-all:1.63.0")
     compileOnly("org.apache.tomcat:annotations-api:6.0.53")
 
-    implementation("com.google.protobuf:protobuf-java:4.26.0")
+    implementation("com.google.protobuf:protobuf-java:3.6.1")
 
     // DI
     implementation("com.google.inject:guice:7.0.0")
@@ -36,7 +36,7 @@ dependencies {
 
 protobuf {
     protoc {
-        artifact = "com.google.protobuf:protoc:4.26.0"
+        artifact = "com.google.protobuf:protoc:3.6.1"
     }
     plugins {
         id("grpc") {

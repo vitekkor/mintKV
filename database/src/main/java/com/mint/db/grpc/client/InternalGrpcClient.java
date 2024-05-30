@@ -34,7 +34,10 @@ public class InternalGrpcClient implements Closeable {
         stub = RaftServiceGrpc.newStub(channel);
     }
 
-    public void requestVote(Raft.VoteRequest voteRequest, TsiFrameProtector.Consumer<Raft.VoteResponse> onRequestVoteResult) {
+    public void requestVote(
+            Raft.VoteRequest voteRequest,
+            TsiFrameProtector.Consumer<Raft.VoteResponse> onRequestVoteResult
+    ) {
         logger.debug("RequestVote request {}", LogUtil.protobufMessageToString(voteRequest));
         stub.requestVote(voteRequest, new StreamObserver<>() {
             @Override
@@ -54,7 +57,10 @@ public class InternalGrpcClient implements Closeable {
         });
     }
 
-    public void appendEntries(Raft.AppendEntriesRequest appendEntriesRequest, TsiFrameProtector.Consumer<Raft.AppendEntriesResponse> onAppendEntriesResult) {
+    public void appendEntries(
+            Raft.AppendEntriesRequest appendEntriesRequest,
+            TsiFrameProtector.Consumer<Raft.AppendEntriesResponse> onAppendEntriesResult
+    ) {
         logger.debug("AppendEntries request {}", LogUtil.protobufMessageToString(appendEntriesRequest));
         stub.appendEntries(appendEntriesRequest, new StreamObserver<>() {
             @Override
