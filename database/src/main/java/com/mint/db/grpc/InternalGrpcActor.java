@@ -11,9 +11,9 @@ import java.util.function.BiConsumer;
 public class InternalGrpcActor implements InternalGrpcActorInterface {
     private static final Logger logger = LoggerFactory.getLogger(InternalGrpcClient.class);
 
-    private final Map<String, InternalGrpcClient> internalGrpcClients;
+    private final Map<Integer, InternalGrpcClient> internalGrpcClients;
 
-    public InternalGrpcActor(Map<String, InternalGrpcClient> internalGrpcClients) {
+    public InternalGrpcActor(Map<Integer, InternalGrpcClient> internalGrpcClients) {
         this.internalGrpcClients = internalGrpcClients;
     }
 
@@ -22,8 +22,8 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
             Raft.VoteRequest voteRequest,
             BiConsumer<Integer, Raft.VoteResponse> onRequestVoteResult
     ) {
-        for (Map.Entry<String, InternalGrpcClient> entry : internalGrpcClients.entrySet()) {
-            int nodeId = Integer.parseInt(entry.getKey());
+        for (Map.Entry<Integer, InternalGrpcClient> entry : internalGrpcClients.entrySet()) {
+            int nodeId = entry.getKey();
             InternalGrpcClient client = entry.getValue();
             client.requestVote(voteRequest, response -> {
                 logger.debug("VoteResponse from node {}: {}", nodeId, response);
@@ -37,8 +37,8 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
             Raft.AppendEntriesRequest appendEntriesRequest,
             BiConsumer<Integer, Raft.AppendEntriesResponse> onAppendEntryResult
     ) {
-        for (Map.Entry<String, InternalGrpcClient> entry : internalGrpcClients.entrySet()) {
-            int nodeId = Integer.parseInt(entry.getKey());
+        for (Map.Entry<Integer, InternalGrpcClient> entry : internalGrpcClients.entrySet()) {
+            int nodeId = entry.getKey();
             InternalGrpcClient client = entry.getValue();
             client.appendEntries(appendEntriesRequest, response -> {
                 logger.debug("AppendEntriesResponse from node {}: {}", nodeId, response);
