@@ -2,13 +2,7 @@ package com.mint.db.config;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
-import com.mint.db.config.annotations.ExternalClientsBean;
-import com.mint.db.config.annotations.ExternalGrpcActorBean;
-import com.mint.db.config.annotations.InternalClientsBean;
-import com.mint.db.config.annotations.InternalGrpcActorBean;
-import com.mint.db.config.annotations.NodeConfiguration;
-import com.mint.db.config.annotations.PersistentStateBean;
-import com.mint.db.config.annotations.RaftActorBean;
+import com.mint.db.config.annotations.*;
 import com.mint.db.grpc.InternalGrpcActor;
 import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.grpc.client.ExternalGrpcClient;
@@ -65,12 +59,12 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @InternalClientsBean
-    static Map<String, InternalGrpcClient> provideInternalGrpcClients(@NodeConfiguration NodeConfig nodeConfig) {
-        Map<String, InternalGrpcClient> internalGrpcClients = new HashMap<>();
+    static Map<Integer, InternalGrpcClient> provideInternalGrpcClients(@NodeConfiguration NodeConfig nodeConfig) {
+        Map<Integer, InternalGrpcClient> internalGrpcClients = new HashMap<>();
         for (int nodeId = 0; nodeId < nodeConfig.getCluster().size(); nodeId++) {
             if (nodeId != nodeConfig.getNodeId()) {
                 String nodeUrl = nodeConfig.getCluster().get(nodeId);
-                internalGrpcClients.put(nodeUrl, new InternalGrpcClient(nodeUrl));
+                internalGrpcClients.put(nodeId, new InternalGrpcClient(nodeUrl));
             }
         }
         return internalGrpcClients;
