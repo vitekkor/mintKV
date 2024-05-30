@@ -53,8 +53,7 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
             Raft.AppendEntriesRequest appendEntriesRequest,
             BiConsumer<Integer, Raft.AppendEntriesResponse> onAppendEntryResult
     ) {
-        String key = String.valueOf(destId);
-        InternalGrpcClient client = internalGrpcClients.get(key);
+        InternalGrpcClient client = internalGrpcClients.get(destId);
 
         if (client != null) {
             client.appendEntries(appendEntriesRequest, response -> {
