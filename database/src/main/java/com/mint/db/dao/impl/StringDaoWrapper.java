@@ -42,7 +42,7 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
         if (entry == null) {
             return null;
         }
-        return new BaseEntry<>(toString(entry.key()), toString(entry.value()));
+        return new BaseEntry<>(toString(entry.key()), toString(entry.committedValue()));
     }
 
     @Override
@@ -58,7 +58,7 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
             public Entry<String> next() {
                 Entry<MemorySegment> next = iterator.next();
                 String key = StringDaoWrapper.toString(next.key());
-                String value = StringDaoWrapper.toString(next.value());
+                String value = StringDaoWrapper.toString(next.committedValue());
                 return new BaseEntry<>(key, value);
             }
         };
@@ -67,8 +67,8 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
     @Override
     public Entry<String> upsert(Entry<String> entry) {
         Entry<MemorySegment> delegateEntry
-                = new BaseEntry<>(toMemorySegment(entry.key()), toMemorySegment(entry.value()));
+                = new BaseEntry<>(toMemorySegment(entry.key()), toMemorySegment(entry.committedValue()));
         Entry<MemorySegment> oldEntry = delegate.upsert(delegateEntry);
-        return oldEntry != null ? new BaseEntry<>(toString(oldEntry.key()), toString(oldEntry.value())) : null;
+        return oldEntry != null ? new BaseEntry<>(toString(oldEntry.key()), toString(oldEntry.committedValue())) : null;
     }
 }

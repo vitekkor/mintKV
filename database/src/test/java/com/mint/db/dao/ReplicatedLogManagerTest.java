@@ -163,10 +163,10 @@ public class ReplicatedLogManagerTest {
     private void checkLogEntry(LogEntry<MemorySegment> expected, LogEntry<MemorySegment> actual) {
         assertEquals(expected.operationType(), actual.operationType());
         assertEquals(expected.entry().key().byteSize(), actual.entry().key().byteSize());
-        if (expected.entry().value() == null) {
-            assertNull(actual.entry().value());
+        if (expected.entry().committedValue() == null) {
+            assertNull(actual.entry().committedValue());
         } else {
-            assertEquals(expected.entry().value().byteSize(), actual.entry().value().byteSize());
+            assertEquals(expected.entry().committedValue().byteSize(), actual.entry().committedValue().byteSize());
         }
         assertEquals(expected.logId(), actual.logId());
     }
