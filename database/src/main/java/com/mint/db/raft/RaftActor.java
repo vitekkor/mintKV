@@ -331,8 +331,8 @@ public class RaftActor implements RaftActorInterface {
                         .addEntries(Raft.LogEntry.newBuilder()
                                 .setTerm(logEntry.logId().term())
                                 .setIndex(logEntry.logId().index())
-                                .setOperation(command instanceof InsertCommand ?
-                                        Raft.Operation.PUT : Raft.Operation.GET)
+                                .setOperation(command instanceof InsertCommand
+                                        ? Raft.Operation.PUT : Raft.Operation.GET)
                                 .setKey(ByteString.copyFromUtf8(command.key()))
                                 .setValue(ByteString.copyFromUtf8(command.value()))
                                 .build())
