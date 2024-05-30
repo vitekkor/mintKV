@@ -1,0 +1,7 @@
+port: 8080
+nodeId: 1
+heartbeatTimeoutMs: 200
+logDir: logs/
+cluster:
+  - node1
+  - node2

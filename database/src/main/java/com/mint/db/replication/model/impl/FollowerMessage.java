@@ -11,4 +11,14 @@ public class FollowerMessage extends Message {
         this.followerUrl = followerUrl;
         this.request = request;
     }
+
+    @Override
+    public String nodeUrl() {
+        return followerUrl;
+    }
+
+    @Override
+    public Raft.AppendEntriesRequest request() {
+        return request;
+    }
 }
