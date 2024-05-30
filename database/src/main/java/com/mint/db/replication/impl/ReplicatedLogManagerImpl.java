@@ -99,11 +99,22 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private void rollbackLog(long index) {
         close();
         try (
-                FileChannel indexChannel = FileChannel.open(indexFile, StandardOpenOption.READ, StandardOpenOption.WRITE);
-                FileChannel logChannel = FileChannel.open(logFile, StandardOpenOption.WRITE)
+                FileChannel indexChannel = FileChannel.open(
+                        indexFile,
+                        StandardOpenOption.READ, StandardOpenOption.WRITE
+                );
+                FileChannel logChannel = FileChannel.open(
+                        logFile,
+                        StandardOpenOption.WRITE
+                )
         ) {
             Arena indexFileArena = Arena.ofConfined();
-            MemorySegment indexSegment = indexChannel.map(FileChannel.MapMode.READ_WRITE, 0, Files.size(indexFile), indexFileArena);
+            MemorySegment indexSegment = indexChannel.map(
+                    FileChannel.MapMode.READ_WRITE,
+                    0,
+                    Files.size(indexFile),
+                    indexFileArena
+            );
             long offset = indexSegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, index * Long.BYTES);
             logChannel.truncate(offset);
             indexFileArena.close();
