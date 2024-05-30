@@ -82,7 +82,12 @@ class RaftActorTest {
             nodeConfig.setPort(8080 + i);
             Mockito.when(nodeConfig.heartbeatRandom()).thenReturn(false);
 
-            RaftActor raftActor = new RaftActor(internalGrpcActor, nodeConfig, new PersistentState(), externalGrpcActor);
+            RaftActor raftActor = new RaftActor(
+                    internalGrpcActor,
+                    nodeConfig,
+                    new PersistentState(),
+                    externalGrpcActor
+            );
             cluster.add(raftActor);
         }
         //CHECKSTYLE.OFF: IndentationCheck
