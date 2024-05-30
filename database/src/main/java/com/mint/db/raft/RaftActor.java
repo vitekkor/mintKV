@@ -61,7 +61,12 @@ public class RaftActor implements RaftActorInterface {
     private int leaderId = -1;
     private long nextTimeout = Long.MAX_VALUE;
 
-    public RaftActor(InternalGrpcActorInterface internalGrpcActor, NodeConfig config, PersistentState state, ExternalGrpcActorInterface externalGrpcActorInterface) {
+    public RaftActor(
+            InternalGrpcActorInterface internalGrpcActor,
+            NodeConfig config,
+            PersistentState state,
+            ExternalGrpcActorInterface externalGrpcActorInterface
+    ) {
         this.externalGrpcActorInterface = externalGrpcActorInterface;
         this.scheduledExecutor = Executors.newScheduledThreadPool(POOL_SIZE);
         this.replicatedLogManager = new ReplicatedLogManagerImpl(config, state);
@@ -304,7 +309,11 @@ public class RaftActor implements RaftActorInterface {
             Entry<MemorySegment> entry = new BaseEntry<>(
                     StringDaoWrapper.toMemorySegment(command.key()),
                     StringDaoWrapper.toMemorySegment(command.value()));
-            LogEntry<MemorySegment> logEntry = new BaseLogEntry<>(operationType, entry, new LogId(lastLogId.term(), lastLogId.index() + 1));
+            LogEntry<MemorySegment> logEntry = new BaseLogEntry<>(
+                    operationType,
+                    entry,
+                    new LogId(lastLogId.term(), lastLogId.index() + 1)
+            );
 
             long[] nextIndex = new long[config.getCluster().size()];
             for (int i = 0; i < nextIndex.length; i++) {
@@ -322,7 +331,8 @@ public class RaftActor implements RaftActorInterface {
                         .addEntries(Raft.LogEntry.newBuilder()
                                 .setTerm(logEntry.logId().term())
                                 .setIndex(logEntry.logId().index())
-                                .setOperation(command instanceof InsertCommand ? Raft.Operation.PUT : Raft.Operation.GET)
+                                .setOperation(command instanceof InsertCommand ?
+                                        Raft.Operation.PUT : Raft.Operation.GET)
                                 .setKey(ByteString.copyFromUtf8(command.key()))
                                 .setValue(ByteString.copyFromUtf8(command.value()))
                                 .build())
