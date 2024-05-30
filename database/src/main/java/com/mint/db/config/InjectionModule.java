@@ -9,6 +9,7 @@ import com.mint.db.config.annotations.InternalGrpcActorBean;
 import com.mint.db.config.annotations.NodeConfiguration;
 import com.mint.db.config.annotations.PersistentStateBean;
 import com.mint.db.config.annotations.RaftActorBean;
+import com.mint.db.grpc.ExternalGrpcActorInterface;
 import com.mint.db.grpc.InternalGrpcActor;
 import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.grpc.client.ExternalGrpcClient;
@@ -58,9 +59,11 @@ public class InjectionModule extends AbstractModule {
     static RaftActorInterface provideRaftActorInterface(
             @InternalGrpcActorBean InternalGrpcActorInterface internalGrpcActor,
             @NodeConfiguration NodeConfig nodeConfig,
-            @PersistentStateBean PersistentState persistentState
+            @PersistentStateBean PersistentState persistentState,
+            @ExternalGrpcActorBean ExternalGrpcActorInterface externalGrpcActor
+
     ) {
-        return new RaftActor(internalGrpcActor, nodeConfig, persistentState);
+        return new RaftActor(internalGrpcActor, nodeConfig, persistentState, externalGrpcActor);
     }
 
     @Provides

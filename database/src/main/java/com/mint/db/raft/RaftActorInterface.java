@@ -51,5 +51,5 @@ public interface RaftActorInterface {
      * Called on result of client command processing. The {@link Command#processId()} is always equal to the
      * identifier of this process.
      */
-    void onClientCommandResult(CommandResult commandResult);
+    void onClientCommandResult(Command command, CommandResult commandResult);
 }
