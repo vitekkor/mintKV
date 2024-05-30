@@ -94,8 +94,8 @@ class RaftActorTest {
                         internalGrpcActorInvocations,
                         ComparatorMatcherBuilder.comparedBy(Integer::compareTo).comparesEqualTo(1)
                 );
-        Mockito.verify(internalGrpcActor, Mockito.times(1))
-                .sendAppendEntriesRequest(Mockito.any(Raft.AppendEntriesRequest.class), Mockito.any());
+        Mockito.verify(internalGrpcActor, Mockito.times(4))
+                .sendAppendEntriesRequest(Mockito.anyInt(), Mockito.any(Raft.AppendEntriesRequest.class), Mockito.any());
         //CHECKSTYLE.ON: IndentationCheck
     }
 }
