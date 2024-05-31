@@ -133,7 +133,8 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private void rollbackLog(long index) {
         try {
             closeOutputStreams();
-            initializeOrUpdateMemorySegments();
+//            initializeOrUpdateMemorySegments();
+            indexOutputMemorySegment = indexOutputMemorySegment.reinterpret(Files.size(indexFile));
             long offset = indexOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, index * Long.BYTES);
             arena.close();
             logOutputFileChannel.truncate(offset);
