@@ -62,7 +62,13 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         initializeMemorySegments();
     }
 
-    public static LogEntry<MemorySegment> createLogEntry(OperationType operationType, MemorySegment key, MemorySegment value, long index, long term) {
+    public static LogEntry<MemorySegment> createLogEntry(
+            OperationType operationType,
+            MemorySegment key,
+            MemorySegment value,
+            long index,
+            long term
+    ) {
         return new BaseLogEntry<>(operationType, new BaseEntry<>(key, value), new LogId(index, term));
     }
 
