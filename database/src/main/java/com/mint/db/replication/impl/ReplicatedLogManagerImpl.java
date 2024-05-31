@@ -16,7 +16,6 @@ import java.io.Closeable;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.RandomAccessFile;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -33,20 +32,25 @@ import java.util.List;
 
 public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegment>, Closeable {
     private static final Logger log = LoggerFactory.getLogger(ReplicatedLogManagerImpl.class);
-    private static final int BUFFER_SIZE = 64 * 1024;
     private static final int BLOB_BUFFER_SIZE = 512;
-    private final NodeConfig nodeConfig;
+    private static final int BUFFER_SIZE = 64 * 1024;
     private final Path logFile;
     private final Path indexFile;
+    private final NodeConfig nodeConfig;
     private final ByteArraySegment longBuffer = new ByteArraySegment(Long.BYTES);
     private final ByteArraySegment blobBuffer = new ByteArraySegment(BLOB_BUFFER_SIZE);
+    private long commitIndex = 0; // todo read from file
+    private Arena arena;
+    private PersistentState state;
+    private long lastLogOffset = 0;
+    private long lastAppliedIndex = 0;
     private OutputStream logOutputStream;
     private OutputStream indexOutputStream;
-    private long lastLogOffset = 0;
-    private PersistentState state;
-    private long commitIndex = 0; // todo read from file
-    private LogId lastLogId;
-    private long lastAppliedIndex = 0;
+    private FileChannel logOutputFileChannel;
+    private FileChannel indexOutputFileChannel;
+    private MemorySegment logOutputMemorySegment;
+    private MemorySegment indexOutputMemorySegment;
+    private LogId lastLogId = new LogId(0, 0);
 
     public ReplicatedLogManagerImpl(NodeConfig nodeConfig, PersistentState state) {
         this.nodeConfig = nodeConfig;
@@ -54,17 +58,47 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         logFile = createLogFile();
         indexFile = createIndexFile();
         openLogOutputStreams(false);
+        initializeOutputFileChannels();
+        initializeOrUpdateMemorySegments();
     }
 
-    public static LogEntry<MemorySegment> createLogEntry(
-            OperationType operationType, MemorySegment key, MemorySegment value, long index, long term) {
-        return new BaseLogEntry<>(
-                operationType,
-                new BaseEntry<>(key, value),
-                new LogId(index, term)
-        );
+    public static LogEntry<MemorySegment> createLogEntry(OperationType operationType, MemorySegment key, MemorySegment value, long index, long term) {
+        return new BaseLogEntry<>(operationType, new BaseEntry<>(key, value), new LogId(index, term));
     }
 
+    private static long calculateLogEntrySize(LogEntry<MemorySegment> logEntry) {
+        long size = Long.BYTES; // operation type
+        size += Long.BYTES; // key size
+        size += logEntry.entry().key().byteSize(); // key
+        size += Long.BYTES; // value size
+        if (logEntry.entry().value() != null) {
+            size += logEntry.entry().value().byteSize(); // value
+        }
+        size += Long.BYTES; // log index
+        size += Long.BYTES; // log term
+        return size;
+    }
+
+    private void initializeOutputFileChannels() {
+        try {
+            logOutputFileChannel = FileChannel.open(logFile, StandardOpenOption.READ, StandardOpenOption.WRITE);
+            indexOutputFileChannel = FileChannel.open(indexFile, StandardOpenOption.READ, StandardOpenOption.WRITE);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to map fileChannels to files", e);
+        }
+    }
+
+    private void initializeOrUpdateMemorySegments() {
+        try {
+            if (arena == null || !arena.scope().isAlive()) {
+                arena = Arena.ofShared();
+            }
+            logOutputMemorySegment = logOutputFileChannel.map(FileChannel.MapMode.READ_WRITE, 0, Files.size(logFile), arena);
+            indexOutputMemorySegment = indexOutputFileChannel.map(FileChannel.MapMode.READ_WRITE, 0, Files.size(indexFile), arena);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to map memorySegments to files", e);
+        }
+    }
     @Override
     public PersistentState readPersistentState() {
         return state;
@@ -97,28 +131,15 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     }
 
     private void rollbackLog(long index) {
-        close();
-        try (
-                FileChannel indexChannel = FileChannel.open(
-                        indexFile,
-                        StandardOpenOption.READ, StandardOpenOption.WRITE
-                );
-                FileChannel logChannel = FileChannel.open(
-                        logFile,
-                        StandardOpenOption.WRITE
-                )
-        ) {
-            Arena indexFileArena = Arena.ofConfined();
-            MemorySegment indexSegment = indexChannel.map(
-                    FileChannel.MapMode.READ_WRITE,
-                    0,
-                    Files.size(indexFile),
-                    indexFileArena
-            );
-            long offset = indexSegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, index * Long.BYTES);
-            logChannel.truncate(offset);
-            indexFileArena.close();
-            indexChannel.truncate(index * Long.BYTES);
+        try {
+            closeOutputStreams();
+            initializeOrUpdateMemorySegments();
+            long offset = indexOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, index * Long.BYTES);
+            arena.close();
+            logOutputFileChannel.truncate(offset);
+            indexOutputFileChannel.truncate(index * Long.BYTES);
+            lastLogOffset = offset;
+            initializeOrUpdateMemorySegments();
         } catch (IOException e) {
             throw new RuntimeException("Failed to rollback log", e);
         }
@@ -133,42 +154,36 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
 
     @Override
     public List<LogEntry<MemorySegment>> readLog(long fromIndex, long toIndex) {
-        try (FileChannel fileChannel = FileChannel.open(indexFile, StandardOpenOption.READ)) {
-            MemorySegment ms = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, Files.size(indexFile), Arena.ofAuto());
-            long offset = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, fromIndex * Long.BYTES);
-            return deserializeLogEntries(offset, toIndex - fromIndex);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        initializeOrUpdateMemorySegments();
+        long offset = indexOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, fromIndex * Long.BYTES);
+        return deserializeLogEntries(offset, toIndex - fromIndex);
     }
 
     public List<LogEntry<MemorySegment>> deserializeLogEntries(long fromOffset, long amount) {
         //CHECKSTYLE.OFF: VariableDeclarationUsageDistanceCheck
-        List<LogEntry<MemorySegment>> logEntries = new ArrayList<>();
-        try (
-                FileChannel fileChannel = FileChannel.open(logFile, StandardOpenOption.READ)
-        ) {
+        initializeOrUpdateMemorySegments();
+        List<LogEntry<MemorySegment>> logEntries = new ArrayList<>((int) amount);
+        try {
             long offset = fromOffset;
-            MemorySegment ms = fileChannel.map(FileChannel.MapMode.READ_ONLY, 0, Files.size(logFile), Arena.ofAuto());
             while (offset < Files.size(logFile) && logEntries.size() < amount) {
-                long operationType = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
+                long operationType = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
                 offset += Long.BYTES;
-                long keySize = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
+                long keySize = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
                 offset += Long.BYTES;
-                MemorySegment key = ms.asSlice(offset, keySize);
+                MemorySegment key = logOutputMemorySegment.asSlice(offset, keySize);
                 offset += keySize;
-                long valueSize = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
+                long valueSize = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
                 MemorySegment value = null;
                 if (valueSize == -1) {
                     offset += Long.BYTES;
                 } else {
                     offset += Long.BYTES;
-                    value = ms.asSlice(offset, valueSize);
+                    value = logOutputMemorySegment.asSlice(offset, valueSize);
                     offset += valueSize;
                 }
-                long index = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
+                long index = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
                 offset += Long.BYTES;
-                long term = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
+                long term = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
                 offset += Long.BYTES;
                 logEntries.add(createLogEntry(OperationType.fromLong(operationType), key, value, index, term));
             }
@@ -189,19 +204,6 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         this.commitIndex = commitIndex;
     }
 
-    private long calculateLogEntrySize(LogEntry<MemorySegment> logEntry) {
-        long size = Long.BYTES; // operation type
-        size += Long.BYTES; // key size
-        size += logEntry.entry().key().byteSize(); // key
-        size += Long.BYTES; // value size
-        if (logEntry.entry().value() != null) {
-            size += logEntry.entry().value().byteSize(); // value
-        }
-        size += Long.BYTES; // log index
-        size += Long.BYTES; // log term
-        return size;
-    }
-
     private void serializeLogEntry(LogEntry<MemorySegment> logEntry) throws IOException {
         writeLong(logEntry.operationType().getValue(), logOutputStream);
         writeLong(logEntry.entry().key().byteSize(), logOutputStream);
@@ -216,33 +218,16 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         writeLong(logEntry.logId().term(), logOutputStream);
     }
 
-    private void writeLong(
-            final long value,
-            final OutputStream os) throws IOException {
-        longBuffer.segment().set(
-                ValueLayout.OfLong.JAVA_LONG_UNALIGNED,
-                0,
-                value);
+    private void writeLong(final long value, final OutputStream os) throws IOException {
+        longBuffer.segment().set(ValueLayout.OfLong.JAVA_LONG_UNALIGNED, 0, value);
         longBuffer.withArray(os::write);
     }
 
-    private void writeSegment(
-            final MemorySegment value,
-            final OutputStream os) throws IOException {
+    private void writeSegment(final MemorySegment value, final OutputStream os) throws IOException {
         final long size = value.byteSize();
         blobBuffer.ensureCapacity(size);
-        MemorySegment.copy(
-                value,
-                0L,
-                blobBuffer.segment(),
-                0L,
-                size);
-        blobBuffer.withArray(array ->
-                os.write(
-                        array,
-                        0,
-                        (int) size)
-        );
+        MemorySegment.copy(value, 0L, blobBuffer.segment(), 0L, size);
+        blobBuffer.withArray(array -> os.write(array, 0, (int) size));
     }
 
     private Path createLogFile() {
@@ -299,23 +284,28 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     @Override
     public void close() {
         try {
-            logOutputStream.close();
-            indexOutputStream.close();
+            closeOutputStreams();
+            logOutputFileChannel.close();
+            indexOutputFileChannel.close();
+            arena.close();
         } catch (IOException e) {
             throw new RuntimeException("Failed to close log file or index file", e);
         }
     }
 
+    private void closeOutputStreams() {
+        try {
+            logOutputStream.close();
+            indexOutputStream.close();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to close log streams", e);
+        }
+    }
+
     private void openLogOutputStreams(boolean append) {
         try {
-            logOutputStream = new BufferedOutputStream(
-                    new FileOutputStream(logFile.toFile(), append),
-                    BUFFER_SIZE
-            );
-            indexOutputStream = new BufferedOutputStream(
-                    new FileOutputStream(indexFile.toFile(), append),
-                    Long.BYTES
-            );
+            logOutputStream = new BufferedOutputStream(new FileOutputStream(logFile.toFile(), append), BUFFER_SIZE);
+            indexOutputStream = new BufferedOutputStream(new FileOutputStream(indexFile.toFile(), append), Long.BYTES);
         } catch (IOException e) {
             throw new RuntimeException("Failed to open log file or index file", e);
         }

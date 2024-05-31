@@ -174,6 +174,9 @@ public class ReplicatedLogManagerTest {
 
         entries = logManager.deserializeLogEntries(0, 10);
         assertEquals(3, entries.size());
+
+        entries = logManager.readLog(1, 2);
+        assertEquals(1, entries.size());
     }
 
     private LogEntry<MemorySegment> deserializeLogEntry(ReplicatedLogManagerImpl logManager) throws IOException {
