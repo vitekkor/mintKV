@@ -59,7 +59,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         indexFile = createIndexFile();
         openLogOutputStreams(false);
         initializeOutputFileChannels();
-        initializeOrUpdateMemorySegments();
+        initializeMemorySegments();
     }
 
     public static LogEntry<MemorySegment> createLogEntry(OperationType operationType, MemorySegment key, MemorySegment value, long index, long term) {
@@ -88,17 +88,45 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         }
     }
 
-    private void initializeOrUpdateMemorySegments() {
+    private void initializeMemorySegments() {
+        if (arena == null || !arena.scope().isAlive()) {
+            arena = Arena.ofShared();
+        }
+        updateLogMemorySegment();
+        updateIndexMemorySegment();
+    }
+
+    private void updateIndexMemorySegment() {
+        if (arena == null || !arena.scope().isAlive()) {
+            throw new RuntimeException("Arena is not alive");
+        }
         try {
-            if (arena == null || !arena.scope().isAlive()) {
-                arena = Arena.ofShared();
-            }
-            logOutputMemorySegment = logOutputFileChannel.map(FileChannel.MapMode.READ_WRITE, 0, Files.size(logFile), arena);
-            indexOutputMemorySegment = indexOutputFileChannel.map(FileChannel.MapMode.READ_WRITE, 0, Files.size(indexFile), arena);
+            indexOutputMemorySegment = indexOutputFileChannel.map(
+                    FileChannel.MapMode.READ_WRITE,
+                    0,
+                    Files.size(indexFile), arena
+            );
         } catch (IOException e) {
             throw new RuntimeException("Failed to map memorySegments to files", e);
         }
     }
+
+    private void updateLogMemorySegment() {
+        if (arena == null || !arena.scope().isAlive()) {
+            throw new RuntimeException("Arena is not alive");
+        }
+        try {
+            logOutputMemorySegment = logOutputFileChannel.map(
+                    FileChannel.MapMode.READ_WRITE,
+                    0,
+                    Files.size(logFile),
+                    arena
+            );
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to map memorySegments to files", e);
+        }
+    }
+
     @Override
     public PersistentState readPersistentState() {
         return state;
@@ -133,13 +161,17 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private void rollbackLog(long index) {
         try {
             closeOutputStreams();
-            initializeOrUpdateMemorySegments();
-            long offset = indexOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, index * Long.BYTES);
+            updateIndexMemorySegment();
+            long offset = indexOutputMemorySegment.get(
+                    ValueLayout.OfByte.JAVA_LONG_UNALIGNED,
+                    index * Long.BYTES
+            );
             arena.close();
             logOutputFileChannel.truncate(offset);
             indexOutputFileChannel.truncate(index * Long.BYTES);
             lastLogOffset = offset;
-            initializeOrUpdateMemorySegments();
+            lastAppliedIndex = index;
+            initializeMemorySegments();
         } catch (IOException e) {
             throw new RuntimeException("Failed to rollback log", e);
         }
@@ -154,14 +186,17 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
 
     @Override
     public List<LogEntry<MemorySegment>> readLog(long fromIndex, long toIndex) {
-        initializeOrUpdateMemorySegments();
-        long offset = indexOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, fromIndex * Long.BYTES);
+        updateIndexMemorySegment();
+        long offset = indexOutputMemorySegment.get(
+                ValueLayout.OfByte.JAVA_LONG_UNALIGNED,
+                fromIndex * Long.BYTES
+        );
         return deserializeLogEntries(offset, toIndex - fromIndex);
     }
 
     public List<LogEntry<MemorySegment>> deserializeLogEntries(long fromOffset, long amount) {
         //CHECKSTYLE.OFF: VariableDeclarationUsageDistanceCheck
-        initializeOrUpdateMemorySegments();
+        updateLogMemorySegment();
         List<LogEntry<MemorySegment>> logEntries = new ArrayList<>((int) amount);
         try {
             long offset = fromOffset;
