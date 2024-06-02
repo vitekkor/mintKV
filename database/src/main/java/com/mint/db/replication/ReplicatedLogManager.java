@@ -28,4 +28,6 @@ public interface ReplicatedLogManager<D> {
     LogEntry<D> readLog(long index);
 
     long commitIndex();
+
+    void setCommitIndex(long commitIndex);
 }
