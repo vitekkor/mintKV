@@ -39,6 +39,7 @@ public class ReplicatedLogManagerTest {
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
                 StringDaoWrapper.toMemorySegment("value"),
+                null,
                 System.currentTimeMillis(),
                 0
         );
@@ -63,6 +64,7 @@ public class ReplicatedLogManagerTest {
         LogEntry<MemorySegment> logEntry = createLogEntry(
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
+                null,
                 null,
                 System.currentTimeMillis(),
                 0
@@ -89,6 +91,7 @@ public class ReplicatedLogManagerTest {
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
                 StringDaoWrapper.toMemorySegment("value"),
+                null,
                 System.currentTimeMillis(),
                 0
         );
@@ -97,6 +100,7 @@ public class ReplicatedLogManagerTest {
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key2"),
                 StringDaoWrapper.toMemorySegment("value2"),
+                null,
                 System.currentTimeMillis(),
                 1
         );
@@ -145,17 +149,23 @@ public class ReplicatedLogManagerTest {
             offset += Long.BYTES;
             long term = ms.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
             offset += Long.BYTES;
-            logEntries.add(createLogEntry(OperationType.fromLong(operationType), key, value, index, term));
+            logEntries.add(createLogEntry(OperationType.fromLong(operationType), key, value, null, index, term));
         }
         return logEntries;
         //CHECKSTYLE.ON
     }
 
     private LogEntry<MemorySegment> createLogEntry(
-            OperationType operationType, MemorySegment key, MemorySegment value, long index, long term) {
+            OperationType operationType,
+            MemorySegment key,
+            MemorySegment committedValue,
+            MemorySegment uncommittedValue,
+            long index,
+            long term
+    ) {
         return new BaseLogEntry<>(
                 operationType,
-                new BaseEntry<>(key, value),
+                new BaseEntry<>(key, committedValue, uncommittedValue, uncommittedValue != null),
                 new LogId(index, term)
         );
     }

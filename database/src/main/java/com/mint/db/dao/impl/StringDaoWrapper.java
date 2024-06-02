@@ -42,7 +42,13 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
         if (entry == null) {
             return null;
         }
-        return new BaseEntry<>(toString(entry.key()), toString(entry.committedValue()));
+
+        return new BaseEntry<>(
+                toString(entry.key()),
+                toString(entry.committedValue()),
+                toString(entry.uncommittedValue()),
+                entry.uncommittedValue() != null
+        );
     }
 
     @Override
@@ -58,17 +64,30 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
             public Entry<String> next() {
                 Entry<MemorySegment> next = iterator.next();
                 String key = StringDaoWrapper.toString(next.key());
-                String value = StringDaoWrapper.toString(next.committedValue());
-                return new BaseEntry<>(key, value);
+                String committedValue = StringDaoWrapper.toString(next.committedValue());
+                String uncommittedValue = StringDaoWrapper.toString(next.uncommittedValue());
+
+                return new BaseEntry<>(key, committedValue, uncommittedValue, uncommittedValue != null);
             }
         };
     }
 
     @Override
     public Entry<String> upsert(Entry<String> entry) {
-        Entry<MemorySegment> delegateEntry
-                = new BaseEntry<>(toMemorySegment(entry.key()), toMemorySegment(entry.committedValue()));
+        Entry<MemorySegment> delegateEntry = new BaseEntry<>(
+                toMemorySegment(entry.key()),
+                toMemorySegment(entry.committedValue()),
+                toMemorySegment(entry.uncommittedValue()),
+                entry.uncommittedValue() != null
+        );
+
         Entry<MemorySegment> oldEntry = delegate.upsert(delegateEntry);
-        return oldEntry != null ? new BaseEntry<>(toString(oldEntry.key()), toString(oldEntry.committedValue())) : null;
+        return oldEntry != null ?
+                new BaseEntry<>(
+                        toString(oldEntry.key()),
+                        toString(oldEntry.committedValue()),
+                        toString(oldEntry.uncommittedValue()),
+                        oldEntry.uncommittedValue() != null
+                ) : null;
     }
 }

@@ -9,6 +9,7 @@ import com.mint.db.raft.model.CommandResult;
 import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
+import com.mint.db.replication.model.LogEntry;
 import com.mint.db.replication.model.Message;
 import com.mint.db.replication.model.PersistentState;
 import com.mint.db.replication.model.impl.BaseLogEntry;
@@ -281,7 +282,7 @@ public class RaftActor implements RaftActorInterface {
     }
 
     private void appendEntitiesIntoLog(Raft.AppendEntriesRequest request) {
-        for (Raft.LogEntry entry : request.getEntriesList()) {
+        for (LogEntry entry : request.getEntriesList()) {
             replicatedLogManager.appendLogEntry(BaseLogEntry.valueOf(entry));
         }
     }

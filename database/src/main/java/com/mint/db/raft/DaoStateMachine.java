@@ -38,27 +38,19 @@ public class DaoStateMachine implements StateMachine<MemorySegment> {
                         toString(entry.committedValue())
                 );
             }
-            case OperationType.PUT -> {
+            case OperationType.PUT, OperationType.DELETE -> {
+                MemorySegment committedValue = operationType == OperationType.PUT ? value : null;
+
                 if (committed) {
-                    dao.upsert(new BaseEntry<>(key, value, null, false));
+                    dao.upsert(new BaseEntry<>(key, committedValue, null, false));
                 } else {
                     Entry<MemorySegment> oldEntry = dao.get(key);
                     MemorySegment oldValue = oldEntry != null ? oldEntry.committedValue() : null;
-                    dao.upsert(new BaseEntry<>(key, oldValue, value, true));
+                    dao.upsert(new BaseEntry<>(key, oldValue, committedValue, true));
                 }
 
                 commandResult = new InsertCommandResult(logEntry.logId().term(), toString(key));
-            }
-            case OperationType.DELETE -> {
-                if (committed) {
-                    dao.upsert(new BaseEntry<>(key, null, null, false));
-                } else {
-                    Entry<MemorySegment> oldEntry = dao.get(key);
-                    MemorySegment oldValue = oldEntry != null ? oldEntry.committedValue() : null;
-                    dao.upsert(new BaseEntry<>(key, oldValue, null, true));
-                }
 
-                commandResult = new InsertCommandResult(logEntry.logId().term(), toString(key));
             }
             default -> {
 

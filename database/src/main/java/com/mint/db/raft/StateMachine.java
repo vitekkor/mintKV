@@ -7,5 +7,5 @@ import java.lang.foreign.MemorySegment;
 
 public interface StateMachine<D> {
 
-    CommandResult apply(LogEntry<MemorySegment> logEntry, boolean commited);
+    CommandResult apply(LogEntry<D> logEntry, boolean committed);
 }

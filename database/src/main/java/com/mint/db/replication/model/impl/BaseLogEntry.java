@@ -1,6 +1,5 @@
 package com.mint.db.replication.model.impl;
 
-import com.mint.db.Raft;
 import com.mint.db.dao.Entry;
 import com.mint.db.dao.impl.BaseEntry;
 import com.mint.db.raft.model.Command;
@@ -14,11 +13,11 @@ public record BaseLogEntry<D>(
         Entry<D> entry,
         LogId logId
 ) implements LogEntry<D> {
-    public static BaseLogEntry<MemorySegment> valueOf(Raft.LogEntry entry) {
+    public static BaseLogEntry<MemorySegment> valueOf(LogEntry logEntry) {
         return new BaseLogEntry<>(
-                OperationType.valueOf(entry.getOperation().name()),
-                BaseEntry.valueOf(entry),
-                new LogId(entry.getIndex(), entry.getTerm())
+                OperationType.valueOf(logEntry.operationType().name()),
+                BaseEntry.valueOf(logEntry),
+                logEntry.logId()
         );
     }
 
