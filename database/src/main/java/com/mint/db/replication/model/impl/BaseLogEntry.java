@@ -13,7 +13,7 @@ public record BaseLogEntry<D>(
         Entry<D> entry,
         LogId logId
 ) implements LogEntry<D> {
-    public static BaseLogEntry<MemorySegment> valueOf(LogEntry logEntry) {
+    public static BaseLogEntry<MemorySegment> valueOf(LogEntry<MemorySegment> logEntry) {
         return new BaseLogEntry<>(
                 OperationType.valueOf(logEntry.operationType().name()),
                 BaseEntry.valueOf(logEntry),
