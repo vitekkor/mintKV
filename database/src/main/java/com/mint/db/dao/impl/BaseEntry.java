@@ -5,7 +5,12 @@ import com.mint.db.replication.model.LogEntry;
 
 import java.lang.foreign.MemorySegment;
 
-public record BaseEntry<D>(D key, D committedValue, D uncommittedValue, boolean uncommittedValueIsNotNull) implements Entry<D> {
+public record BaseEntry<D>(
+    D key, 
+    D committedValue, 
+    D uncommittedValue, 
+    boolean uncommittedValueIsNotNull
+) implements Entry<D> {
     public static BaseEntry<MemorySegment> valueOf(LogEntry<MemorySegment> logEntry) {
         return new BaseEntry<>(
                 StringDaoWrapper.toMemorySegment(entry.getKey().toStringUtf8()),
