@@ -2,7 +2,6 @@ package com.mint.db.dao.impl;
 
 import com.mint.db.dao.Dao;
 import com.mint.db.dao.Entry;
-import jdk.incubator.foreign.MemorySegment;
 
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;

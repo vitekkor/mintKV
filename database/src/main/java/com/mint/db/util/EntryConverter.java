@@ -13,8 +13,8 @@ public final class EntryConverter {
 
     public static Raft.LogEntry logEntryToRaftLogEntry(LogEntry<MemorySegment> logEntry) {
         ByteString key = ByteString.copyFrom(logEntry.entry().key().toArray(ValueLayout.JAVA_BYTE));
-        ByteString value = logEntry.entry().value() != null
-                ? ByteString.copyFrom(logEntry.entry().value().toArray(ValueLayout.JAVA_BYTE))
+        ByteString value = logEntry.entry().committedValue() != null
+                ? ByteString.copyFrom(logEntry.entry().committedValue().toArray(ValueLayout.JAVA_BYTE))
                 : ByteString.EMPTY;
         Raft.Operation operation = Raft.Operation.valueOf(logEntry.operationType().name());
         return Raft.LogEntry.newBuilder()

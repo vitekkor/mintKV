@@ -11,7 +11,7 @@ public record BaseEntry<D>(
     D uncommittedValue, 
     boolean uncommittedValueIsNotNull
 ) implements Entry<D> {
-    public static BaseEntry<MemorySegment> valueOf(LogEntry<MemorySegment> logEntry) {
+    public static BaseEntry<MemorySegment> valueOf(Raft.LogEntry entry) {
         return new BaseEntry<>(
                 StringDaoWrapper.toMemorySegment(entry.getKey().toStringUtf8()),
                 StringDaoWrapper.toMemorySegment(entry.getValue().toStringUtf8()),
