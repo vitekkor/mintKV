@@ -2,6 +2,7 @@ package com.mint.db.dao.impl;
 
 import com.mint.db.dao.Dao;
 import com.mint.db.dao.Entry;
+import jdk.incubator.foreign.MemorySegment;
 
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
@@ -74,20 +75,28 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
 
     @Override
     public Entry<String> upsert(Entry<String> entry) {
-        Entry<MemorySegment> delegateEntry = new BaseEntry<>(
+        Entry<MemorySegment> delegateEntry = toBaseEntryMemorySegment(entry);
+
+        Entry<MemorySegment> oldEntry = delegate.upsert(delegateEntry);
+        return oldEntry != null ? toBaseEntryString(oldEntry) : null;
+    }
+
+    private BaseEntry<String> toBaseEntryString(Entry<MemorySegment> entry) {
+        return new BaseEntry<>(
+                toString(entry.key()),
+                toString(entry.committedValue()),
+                toString(entry.uncommittedValue()),
+                entry.uncommittedValue() != null
+        );
+    }
+
+    private BaseEntry<MemorySegment> toBaseEntryMemorySegment(Entry<String> entry) {
+        return new BaseEntry<>(
                 toMemorySegment(entry.key()),
                 toMemorySegment(entry.committedValue()),
                 toMemorySegment(entry.uncommittedValue()),
                 entry.uncommittedValue() != null
         );
-
-        Entry<MemorySegment> oldEntry = delegate.upsert(delegateEntry);
-        return oldEntry != null ?
-                new BaseEntry<>(
-                        toString(oldEntry.key()),
-                        toString(oldEntry.committedValue()),
-                        toString(oldEntry.uncommittedValue()),
-                        oldEntry.uncommittedValue() != null
-                ) : null;
     }
+
 }

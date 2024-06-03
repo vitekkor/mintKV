@@ -281,7 +281,7 @@ public class RaftActor implements RaftActorInterface {
     }
 
     private void appendEntitiesIntoLog(Raft.AppendEntriesRequest request) {
-        for (LogEntry entry : request.getEntriesList()) {
+        for (Raft.LogEntry entry : request.getEntriesList()) {
             replicatedLogManager.appendLogEntry(BaseLogEntry.valueOf(entry));
         }
     }

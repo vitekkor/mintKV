@@ -13,11 +13,11 @@ public record BaseLogEntry<D>(
         Entry<D> entry,
         LogId logId
 ) implements LogEntry<D> {
-    public static BaseLogEntry<MemorySegment> valueOf(LogEntry<MemorySegment> logEntry) {
+    public static BaseLogEntry<MemorySegment> valueOf(Raft.LogEntry entry) {
         return new BaseLogEntry<>(
-                OperationType.valueOf(logEntry.operationType().name()),
-                BaseEntry.valueOf(logEntry),
-                logEntry.logId()
+                OperationType.valueOf(entry.getOperation().name()),
+                BaseEntry.valueOf(entry),
+                new LogId(entry.getIndex(), entry.getTerm())
         );
     }
 

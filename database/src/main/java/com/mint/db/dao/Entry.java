@@ -6,4 +6,6 @@ public interface Entry<D> {
     D committedValue();
 
     D uncommittedValue();
+
+    boolean uncommittedValueIsNotNull();
 }
