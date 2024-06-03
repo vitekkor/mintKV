@@ -85,6 +85,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         return commitIndex;
     }
 
+    @Override
     public void setCommitIndex(long commitIndex) {
         // todo write to file
         this.commitIndex = commitIndex;

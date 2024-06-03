@@ -39,7 +39,7 @@ public class InjectionModule extends AbstractModule {
     @Provides
     @InternalGrpcActorBean
     static InternalGrpcActorInterface provideInternalGrpcActorInterface(
-            @InternalClientsBean Map<String, InternalGrpcClient> internalGrpcClients
+            @InternalClientsBean Map<Integer, InternalGrpcClient> internalGrpcClients
     ) {
         return new InternalGrpcActor(internalGrpcClients);
     }
@@ -47,7 +47,7 @@ public class InjectionModule extends AbstractModule {
     @Provides
     @ExternalGrpcActorBean
     static ExternalServiceImpl provideExternalGrpcActorInterface(
-            @ExternalClientsBean Map<String, ExternalGrpcClient> externalGrpcClients
+            @ExternalClientsBean Map<Integer, ExternalGrpcClient> externalGrpcClients
     ) {
         return new ExternalServiceImpl(externalGrpcClients);
     }
@@ -65,12 +65,12 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @InternalClientsBean
-    static Map<String, InternalGrpcClient> provideInternalGrpcClients(@NodeConfiguration NodeConfig nodeConfig) {
-        Map<String, InternalGrpcClient> internalGrpcClients = new HashMap<>();
+    static Map<Integer, InternalGrpcClient> provideInternalGrpcClients(@NodeConfiguration NodeConfig nodeConfig) {
+        Map<Integer, InternalGrpcClient> internalGrpcClients = new HashMap<>();
         for (int nodeId = 0; nodeId < nodeConfig.getCluster().size(); nodeId++) {
             if (nodeId != nodeConfig.getNodeId()) {
                 String nodeUrl = nodeConfig.getCluster().get(nodeId);
-                internalGrpcClients.put(nodeUrl, new InternalGrpcClient(nodeUrl));
+                internalGrpcClients.put(nodeId, new InternalGrpcClient(nodeUrl));
             }
         }
         return internalGrpcClients;
@@ -78,12 +78,12 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @ExternalClientsBean
-    static Map<String, ExternalGrpcClient> provideExternalGrpcClients(@NodeConfiguration NodeConfig nodeConfig) {
-        Map<String, ExternalGrpcClient> externalGrpcClients = new HashMap<>();
+    static Map<Integer, ExternalGrpcClient> provideExternalGrpcClients(@NodeConfiguration NodeConfig nodeConfig) {
+        Map<Integer, ExternalGrpcClient> externalGrpcClients = new HashMap<>();
         for (int nodeId = 0; nodeId < nodeConfig.getCluster().size(); nodeId++) {
             if (nodeId != nodeConfig.getNodeId()) {
                 String nodeUrl = nodeConfig.getCluster().get(nodeId);
-                externalGrpcClients.put(nodeUrl, new ExternalGrpcClient(nodeUrl));
+                externalGrpcClients.put(nodeId, new ExternalGrpcClient(nodeUrl));
             }
         }
         return externalGrpcClients;
