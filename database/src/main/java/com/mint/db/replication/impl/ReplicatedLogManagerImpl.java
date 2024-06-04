@@ -95,9 +95,9 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         writeLong(logEntry.operationType().getValue(), outputStream);
         writeLong(logEntry.entry().key().byteSize(), outputStream);
         writeSegment(logEntry.entry().key(), outputStream);
-        if (logEntry.entry().value() != null) {
-            writeLong(logEntry.entry().value().byteSize(), outputStream);
-            writeSegment(logEntry.entry().value(), outputStream);
+        if (logEntry.entry().committedValue() != null) {
+            writeLong(logEntry.entry().committedValue().byteSize(), outputStream);
+            writeSegment(logEntry.entry().committedValue(), outputStream);
         } else {
             writeLong(-1, outputStream);
         }
