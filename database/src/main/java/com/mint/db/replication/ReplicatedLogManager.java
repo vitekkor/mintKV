@@ -35,4 +35,6 @@ public interface ReplicatedLogManager<D> {
     List<LogEntry<D>> readLog(long fromIndex, long toIndex);
 
     long commitIndex();
+
+    void setCommitIndex(long commitIndex);
 }

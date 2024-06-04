@@ -94,9 +94,9 @@ public class BaseTest {
         throw new AssertionFailedError(entry + " not found in iterator with elements count " + count);
     }
 
-    public Entry<String> entry(String key, String value) {
+    public Entry<String> entry(String key, String committedValue) {
         checkInterrupted();
-        return new BaseEntry<>(key, value);
+        return new BaseEntry<>(key, committedValue, null, false);
     }
 
     public List<Entry<String>> entries(int count) {
@@ -112,7 +112,7 @@ public class BaseTest {
                     throw new IndexOutOfBoundsException("Index is " + index + ", size is " + count);
                 }
                 String paddedIdx = String.format("%010d", index);
-                return new BaseEntry<>(keyPrefix + paddedIdx, valuePrefix + paddedIdx);
+                return new BaseEntry<>(keyPrefix + paddedIdx, valuePrefix + paddedIdx, null, false);
             }
 
             @Override
@@ -123,7 +123,7 @@ public class BaseTest {
     }
 
     public Entry<String> entryAt(int index) {
-        return new BaseEntry<>(keyAt(index), valueAt(index));
+        return new BaseEntry<>(keyAt(index), valueAt(index), null, false);
     }
 
     public String keyAt(int index) {

@@ -30,6 +30,7 @@ public class ReplicatedLogManagerTest {
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
                 StringDaoWrapper.toMemorySegment("value"),
+                null,
                 System.currentTimeMillis(),
                 0
         );
@@ -47,6 +48,7 @@ public class ReplicatedLogManagerTest {
         LogEntry<MemorySegment> logEntry = createLogEntry(
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
+                null,
                 null,
                 System.currentTimeMillis(),
                 0
@@ -66,6 +68,7 @@ public class ReplicatedLogManagerTest {
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key"),
                 StringDaoWrapper.toMemorySegment("value"),
+                null,
                 System.currentTimeMillis(),
                 0
         );
@@ -74,6 +77,7 @@ public class ReplicatedLogManagerTest {
                 OperationType.PUT,
                 StringDaoWrapper.toMemorySegment("key2"),
                 StringDaoWrapper.toMemorySegment("value2"),
+                null,
                 System.currentTimeMillis(),
                 1
         );
@@ -187,11 +191,11 @@ public class ReplicatedLogManagerTest {
         assertEquals(expected.operationType(), actual.operationType());
         assertEquals(expected.entry().key().byteSize(), actual.entry().key().byteSize());
         assertEquals(expected.entry().key().asByteBuffer().get(), actual.entry().key().asByteBuffer().get());
-        if (expected.entry().value() == null) {
-            assertNull(actual.entry().value());
+        if (expected.entry().committedValue() == null) {
+            assertNull(actual.entry().committedValue());
         } else {
-            assertEquals(expected.entry().value().byteSize(), actual.entry().value().byteSize());
-            assertEquals(expected.entry().value().asByteBuffer().get(), actual.entry().value().asByteBuffer().get());
+            assertEquals(expected.entry().committedValue().byteSize(), actual.entry().committedValue().byteSize());
+            assertEquals(expected.entry().committedValue().asByteBuffer().get(), actual.entry().value().asByteBuffer().get());
         }
         assertEquals(expected.logId(), actual.logId());
     }

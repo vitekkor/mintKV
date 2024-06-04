@@ -240,18 +240,19 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         return commitIndex;
     }
 
+    @Override
     public void setCommitIndex(long commitIndex) {
         // todo write to file
         this.commitIndex = commitIndex;
     }
 
     private void serializeLogEntry(LogEntry<MemorySegment> logEntry) throws IOException {
-        writeLong(logEntry.operationType().getValue(), logOutputStream);
-        writeLong(logEntry.entry().key().byteSize(), logOutputStream);
-        writeSegment(logEntry.entry().key(), logOutputStream);
-        if (logEntry.entry().value() != null) {
-            writeLong(logEntry.entry().value().byteSize(), logOutputStream);
-            writeSegment(logEntry.entry().value(), logOutputStream);
+        writeLong(logEntry.operationType().getValue(), outputStream);
+        writeLong(logEntry.entry().key().byteSize(), outputStream);
+        writeSegment(logEntry.entry().key(), outputStream);
+        if (logEntry.entry().committedValue() != null) {
+            writeLong(logEntry.entry().committedValue().byteSize(), outputStream);
+            writeSegment(logEntry.entry().committedValue(), outputStream);
         } else {
             writeLong(-1, logOutputStream);
         }

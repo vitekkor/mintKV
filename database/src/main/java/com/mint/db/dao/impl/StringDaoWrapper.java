@@ -29,20 +29,14 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
         return MemorySegment.ofArray(string.getBytes(StandardCharsets.UTF_8));
     }
 
-    public static MemorySegment toMemorySegment(byte[] bytes) {
-        if (bytes == null) {
-            return null;
-        }
-        return MemorySegment.ofArray(bytes);
-    }
-
     @Override
     public Entry<String> get(String key) {
         Entry<MemorySegment> entry = delegate.get(toMemorySegment(key));
         if (entry == null) {
             return null;
         }
-        return new BaseEntry<>(toString(entry.key()), toString(entry.value()));
+
+        return toBaseEntryString(entry);
     }
 
     @Override
@@ -57,18 +51,35 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
             @Override
             public Entry<String> next() {
                 Entry<MemorySegment> next = iterator.next();
-                String key = StringDaoWrapper.toString(next.key());
-                String value = StringDaoWrapper.toString(next.value());
-                return new BaseEntry<>(key, value);
+                return toBaseEntryString(next);
             }
         };
     }
 
     @Override
     public Entry<String> upsert(Entry<String> entry) {
-        Entry<MemorySegment> delegateEntry
-                = new BaseEntry<>(toMemorySegment(entry.key()), toMemorySegment(entry.value()));
+        Entry<MemorySegment> delegateEntry = toBaseEntryMemorySegment(entry);
+
         Entry<MemorySegment> oldEntry = delegate.upsert(delegateEntry);
-        return oldEntry != null ? new BaseEntry<>(toString(oldEntry.key()), toString(oldEntry.value())) : null;
+        return oldEntry != null ? toBaseEntryString(oldEntry) : null;
     }
+
+    private BaseEntry<String> toBaseEntryString(Entry<MemorySegment> entry) {
+        return new BaseEntry<>(
+                toString(entry.key()),
+                toString(entry.committedValue()),
+                toString(entry.uncommittedValue()),
+                entry.uncommittedValueIsNotNull()
+        );
+    }
+
+    private BaseEntry<MemorySegment> toBaseEntryMemorySegment(Entry<String> entry) {
+        return new BaseEntry<>(
+                toMemorySegment(entry.key()),
+                toMemorySegment(entry.committedValue()),
+                toMemorySegment(entry.uncommittedValue()),
+                entry.uncommittedValueIsNotNull()
+        );
+    }
+
 }

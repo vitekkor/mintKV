@@ -12,7 +12,7 @@ class UpsertRemoveTest extends BaseTest {
     void removeShouldUpsertNullValue() {
         dao.upsert(entryAt(1));
         dao.upsert(entry(keyAt(1), null));
-        Assertions.assertNull(dao.get(keyAt(1)).value());
+        Assertions.assertNull(dao.get(keyAt(1)).committedValue());
     }
 
     @Test
@@ -20,7 +20,7 @@ class UpsertRemoveTest extends BaseTest {
         dao.upsert(entryAt(1));
         dao.upsert(entryAt(2));
         dao.upsert(entry(keyAt(1), null));
-        Assertions.assertNotNull(dao.get(keyAt(2)).value());
+        Assertions.assertNotNull(dao.get(keyAt(2)).committedValue());
     }
 
     @Test
