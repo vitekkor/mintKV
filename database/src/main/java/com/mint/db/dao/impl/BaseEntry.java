@@ -1,5 +1,6 @@
 package com.mint.db.dao.impl;
 
+import com.mint.db.Raft;
 import com.mint.db.dao.Entry;
 import com.mint.db.replication.model.LogEntry;
 
