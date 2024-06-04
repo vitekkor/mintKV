@@ -224,7 +224,7 @@ public class RaftActor implements RaftActorInterface {
             replicatedLogManager.setCommitIndex(newCommitIndex);
             for (long i = lastCommitIndex + 1; i < newCommitIndex; i++) {
                 LogEntry<MemorySegment> logEntry = replicatedLogManager.readLog(i);
-                stateMachine.apply(logEntry);
+                stateMachine.apply(logEntry, true);
             }
         }
     }
@@ -240,7 +240,7 @@ public class RaftActor implements RaftActorInterface {
             long newCommitIndex = Math.min(lastApplied, appendEntriesRequest.getLeaderCommit());
             for (long i = lastCommitIndex + 1; i < newCommitIndex; i++) {
                 LogEntry<MemorySegment> logEntry = replicatedLogManager.readLog(i);
-                stateMachine.apply(logEntry);
+                stateMachine.apply(logEntry, true);
             }
         }
 

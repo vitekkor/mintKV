@@ -28,11 +28,11 @@ public record BaseEntry<D>(
 
     @Override
     public String toString() {
-        return "BaseEntry{" +
-                "key=" + key +
-                ", committedValue=" + committedValue +
-                ", uncommittedValue=" + uncommittedValue +
-                ", uncommittedValueIsNotNull=" + uncommittedValueIsNotNull +
-                '}';
+        return "BaseEntry{"
+                + "key=" + key
+                + ", committedValue=" + committedValue
+                + ", uncommittedValue=" + uncommittedValue
+                + ", uncommittedValueIsNotNull=" + uncommittedValueIsNotNull
+                + '}';
     }
 }
