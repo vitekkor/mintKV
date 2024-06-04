@@ -2,15 +2,14 @@ package com.mint.db.dao.impl;
 
 import com.mint.db.Raft;
 import com.mint.db.dao.Entry;
-import com.mint.db.replication.model.LogEntry;
 
 import java.lang.foreign.MemorySegment;
 
 public record BaseEntry<D>(
-    D key, 
-    D committedValue, 
-    D uncommittedValue, 
-    boolean uncommittedValueIsNotNull
+        D key,
+        D committedValue,
+        D uncommittedValue,
+        boolean uncommittedValueIsNotNull
 ) implements Entry<D> {
     public static BaseEntry<MemorySegment> valueOf(Raft.LogEntry entry) {
         return new BaseEntry<>(
@@ -19,11 +18,6 @@ public record BaseEntry<D>(
                 null,
                 false
         );
-    }
-
-    @Override
-    public D uncommittedValue() {
-        return uncommittedValueIsNotNull ? uncommittedValue : committedValue;
     }
 
     @Override

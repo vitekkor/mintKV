@@ -29,13 +29,6 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
         return MemorySegment.ofArray(string.getBytes(StandardCharsets.UTF_8));
     }
 
-    public static MemorySegment toMemorySegment(byte[] bytes) {
-        if (bytes == null) {
-            return null;
-        }
-        return MemorySegment.ofArray(bytes);
-    }
-
     @Override
     public Entry<String> get(String key) {
         Entry<MemorySegment> entry = delegate.get(toMemorySegment(key));
@@ -43,12 +36,7 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
             return null;
         }
 
-        return new BaseEntry<>(
-                toString(entry.key()),
-                toString(entry.committedValue()),
-                toString(entry.uncommittedValue()),
-                entry.uncommittedValue() != null
-        );
+        return toBaseEntryString(entry);
     }
 
     @Override
@@ -63,11 +51,7 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
             @Override
             public Entry<String> next() {
                 Entry<MemorySegment> next = iterator.next();
-                String key = StringDaoWrapper.toString(next.key());
-                String committedValue = StringDaoWrapper.toString(next.committedValue());
-                String uncommittedValue = StringDaoWrapper.toString(next.uncommittedValue());
-
-                return new BaseEntry<>(key, committedValue, uncommittedValue, uncommittedValue != null);
+                return toBaseEntryString(next);
             }
         };
     }
@@ -85,7 +69,7 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
                 toString(entry.key()),
                 toString(entry.committedValue()),
                 toString(entry.uncommittedValue()),
-                entry.uncommittedValue() != null
+                entry.uncommittedValueIsNotNull()
         );
     }
 
@@ -94,7 +78,7 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
                 toMemorySegment(entry.key()),
                 toMemorySegment(entry.committedValue()),
                 toMemorySegment(entry.uncommittedValue()),
-                entry.uncommittedValue() != null
+                entry.uncommittedValueIsNotNull()
         );
     }
 
