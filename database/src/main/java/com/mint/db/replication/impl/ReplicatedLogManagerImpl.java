@@ -264,7 +264,15 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
                 offset += Long.BYTES;
                 long term = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
                 offset += Long.BYTES;
-                logEntries.add(createLogEntry(OperationType.fromLong(operationType), key, committedValue, uncommittedValue, index, term));
+                logEntries.add(
+                        createLogEntry(
+                                OperationType.fromLong(operationType),
+                                key,
+                                committedValue,
+                                uncommittedValue,
+                                index,
+                                term)
+                );
             }
         } catch (IOException e) {
             throw new RuntimeException(e);

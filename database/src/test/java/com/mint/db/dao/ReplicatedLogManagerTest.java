@@ -299,7 +299,10 @@ public class ReplicatedLogManagerTest {
             assertNull(actual.entry().committedValue());
         } else {
             assertEquals(expected.entry().committedValue().byteSize(), actual.entry().committedValue().byteSize());
-            assertEquals(expected.entry().committedValue().asByteBuffer().get(), actual.entry().committedValue().asByteBuffer().get());
+            assertEquals(
+                    expected.entry().committedValue().asByteBuffer().get(),
+                    actual.entry().committedValue().asByteBuffer().get()
+            );
         }
         assertEquals(expected.logId(), actual.logId());
     }
