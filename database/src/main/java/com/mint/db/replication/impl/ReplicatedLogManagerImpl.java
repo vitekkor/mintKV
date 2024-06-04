@@ -2,6 +2,7 @@ package com.mint.db.replication.impl;
 
 import com.mint.db.config.NodeConfig;
 import com.mint.db.dao.impl.BaseEntry;
+import com.mint.db.dao.impl.StringDaoWrapper;
 import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.model.LogEntry;
@@ -34,13 +35,14 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private static final Logger log = LoggerFactory.getLogger(ReplicatedLogManagerImpl.class);
     private static final int BLOB_BUFFER_SIZE = 512;
     private static final int BUFFER_SIZE = 64 * 1024;
-    private final Path logFile;
-    private final Path indexFile;
+    private final StringDaoWrapper dao;
     private final NodeConfig nodeConfig;
     private final ByteArraySegment longBuffer = new ByteArraySegment(Long.BYTES);
     private final ByteArraySegment blobBuffer = new ByteArraySegment(BLOB_BUFFER_SIZE);
     private long commitIndex = 0; // todo read from file
     private Arena arena;
+    private Path logFile;
+    private Path indexFile;
     private PersistentState state;
     private long lastLogOffset = 0;
     private long lastAppliedIndex = 0;
@@ -52,33 +54,42 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private MemorySegment indexOutputMemorySegment;
     private LogId lastLogId = new LogId(0, 0);
 
-    public ReplicatedLogManagerImpl(NodeConfig nodeConfig, PersistentState state) {
+    public ReplicatedLogManagerImpl(NodeConfig nodeConfig, PersistentState state, StringDaoWrapper dao) {
+        this.dao = dao;
         this.nodeConfig = nodeConfig;
         this.state = state;
-        logFile = createLogFile();
-        indexFile = createIndexFile();
-        openLogOutputStreams(false);
+        initializeLogFiles();
         initializeOutputFileChannels();
         initializeMemorySegments();
+        configureParameters();
     }
 
     public static LogEntry<MemorySegment> createLogEntry(
             OperationType operationType,
             MemorySegment key,
-            MemorySegment value,
+            MemorySegment committedValue,
+            MemorySegment uncommittedValue,
             long index,
             long term
     ) {
-        return new BaseLogEntry<>(operationType, new BaseEntry<>(key, value), new LogId(index, term));
+        return new BaseLogEntry<>(
+                operationType,
+                new BaseEntry<>(key, committedValue, uncommittedValue, uncommittedValue != null),
+                new LogId(index, term)
+        );
     }
 
     private static long calculateLogEntrySize(LogEntry<MemorySegment> logEntry) {
         long size = Long.BYTES; // operation type
         size += Long.BYTES; // key size
         size += logEntry.entry().key().byteSize(); // key
-        size += Long.BYTES; // value size
-        if (logEntry.entry().value() != null) {
-            size += logEntry.entry().value().byteSize(); // value
+        size += Long.BYTES; // committed value size
+        if (logEntry.entry().committedValue() != null) {
+            size += logEntry.entry().committedValue().byteSize(); // committed value
+        }
+        size += Long.BYTES; // uncommitted value size
+        if (logEntry.entry().uncommittedValueIsNotNull()) {
+            size += logEntry.entry().uncommittedValue().byteSize(); // uncommitted value
         }
         size += Long.BYTES; // log index
         size += Long.BYTES; // log term
@@ -172,6 +183,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
                     ValueLayout.OfByte.JAVA_LONG_UNALIGNED,
                     index * Long.BYTES
             );
+            rollbackEntries(deserializeLogEntries(offset));
             arena.close();
             logOutputFileChannel.truncate(offset);
             indexOutputFileChannel.truncate(index * Long.BYTES);
@@ -183,6 +195,19 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         }
 
         openLogOutputStreams(true);
+    }
+
+    private void rollbackEntries(List<LogEntry<MemorySegment>> oldEntries) {
+        for (LogEntry<MemorySegment> oldEntry : oldEntries.reversed()) {
+            var newEntry = new BaseEntry<>(
+                    oldEntry.entry().key(),
+                    oldEntry.entry().committedValue(),
+                    null,
+                    false
+            );
+            var baseEntryString = StringDaoWrapper.toBaseEntryString(newEntry);
+            dao.upsert(baseEntryString);
+        }
     }
 
     @Override
@@ -197,36 +222,49 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
                 ValueLayout.OfByte.JAVA_LONG_UNALIGNED,
                 fromIndex * Long.BYTES
         );
-        return deserializeLogEntries(offset, toIndex - fromIndex);
+        return deserializeLogEntries(offset, toIndex - fromIndex, false);
     }
 
-    public List<LogEntry<MemorySegment>> deserializeLogEntries(long fromOffset, long amount) {
+    public List<LogEntry<MemorySegment>> deserializeLogEntries(long fromOffset) {
+        return deserializeLogEntries(fromOffset, 10, true);
+    }
+
+    public List<LogEntry<MemorySegment>> deserializeLogEntries(long fromOffset, long amount, boolean tillEnd) {
         //CHECKSTYLE.OFF: VariableDeclarationUsageDistanceCheck
         updateLogMemorySegment();
         List<LogEntry<MemorySegment>> logEntries = new ArrayList<>((int) amount);
         try {
             long offset = fromOffset;
-            while (offset < Files.size(logFile) && logEntries.size() < amount) {
+            while (offset < Files.size(logFile) && (tillEnd || logEntries.size() < amount)) {
                 long operationType = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
                 offset += Long.BYTES;
                 long keySize = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
                 offset += Long.BYTES;
                 MemorySegment key = logOutputMemorySegment.asSlice(offset, keySize);
                 offset += keySize;
-                long valueSize = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
-                MemorySegment value = null;
-                if (valueSize == -1) {
+                long committedValueSize = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
+                MemorySegment committedValue = null;
+                if (committedValueSize == -1) {
                     offset += Long.BYTES;
                 } else {
                     offset += Long.BYTES;
-                    value = logOutputMemorySegment.asSlice(offset, valueSize);
-                    offset += valueSize;
+                    committedValue = logOutputMemorySegment.asSlice(offset, committedValueSize);
+                    offset += committedValueSize;
+                }
+                long uncommittedValueSize = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
+                MemorySegment uncommittedValue = null;
+                if (uncommittedValueSize == -1) {
+                    offset += Long.BYTES;
+                } else {
+                    offset += Long.BYTES;
+                    uncommittedValue = logOutputMemorySegment.asSlice(offset, uncommittedValueSize);
+                    offset += uncommittedValueSize;
                 }
                 long index = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
                 offset += Long.BYTES;
                 long term = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
                 offset += Long.BYTES;
-                logEntries.add(createLogEntry(OperationType.fromLong(operationType), key, value, index, term));
+                logEntries.add(createLogEntry(OperationType.fromLong(operationType), key, committedValue, uncommittedValue, index, term));
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -247,12 +285,18 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     }
 
     private void serializeLogEntry(LogEntry<MemorySegment> logEntry) throws IOException {
-        writeLong(logEntry.operationType().getValue(), outputStream);
-        writeLong(logEntry.entry().key().byteSize(), outputStream);
-        writeSegment(logEntry.entry().key(), outputStream);
+        writeLong(logEntry.operationType().getValue(), logOutputStream);
+        writeLong(logEntry.entry().key().byteSize(), logOutputStream);
+        writeSegment(logEntry.entry().key(), logOutputStream);
         if (logEntry.entry().committedValue() != null) {
-            writeLong(logEntry.entry().committedValue().byteSize(), outputStream);
-            writeSegment(logEntry.entry().committedValue(), outputStream);
+            writeLong(logEntry.entry().committedValue().byteSize(), logOutputStream);
+            writeSegment(logEntry.entry().committedValue(), logOutputStream);
+        } else {
+            writeLong(-1, logOutputStream);
+        }
+        if (logEntry.entry().uncommittedValueIsNotNull()) {
+            writeLong(logEntry.entry().uncommittedValue().byteSize(), logOutputStream);
+            writeSegment(logEntry.entry().uncommittedValue(), logOutputStream);
         } else {
             writeLong(-1, logOutputStream);
         }
@@ -272,7 +316,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         blobBuffer.withArray(array -> os.write(array, 0, (int) size));
     }
 
-    private Path createLogFile() {
+    private void initializeLogFiles() {
         if (nodeConfig.getLogDir() == null) {
             throw new IllegalArgumentException("Log directory is not set in the configuration");
         }
@@ -289,6 +333,61 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         if (!Files.isDirectory(logDir)) {
             throw new IllegalArgumentException("Log directory path is not a directory");
         }
+        Path databaseFile = logDir.resolve("database");
+        if (!Files.exists(databaseFile)) {
+            try {
+                Files.createFile(databaseFile);
+            } catch (FileAlreadyExistsException e) {
+                throw new RuntimeException("Database file already exists", e);
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create database file", e);
+            }
+        }
+        try {
+            if (Files.size(databaseFile) == 0) {
+                logFile = createLogFile(logDir);
+                indexFile = createIndexFile();
+                var name = logFile.getFileName().toString();
+                var nameWithoutExtensionWithDelimiter =
+                        STR."\{name.substring(0, name.lastIndexOf('.'))}\n";
+                Files.write(databaseFile, nameWithoutExtensionWithDelimiter.getBytes());
+                openLogOutputStreams(false);
+            } else {
+                var nameWithDelimiter = Files.readString(databaseFile);
+                var name = nameWithDelimiter.substring(0, nameWithDelimiter.length() - 1);
+                logFile = logDir.resolve(STR."\{name}.log");
+                indexFile = logDir.resolve(STR."\{name}.index");
+                openLogOutputStreams(true);
+            }
+            if (!Files.exists(logFile) || !Files.exists(indexFile)) {
+                throw new RuntimeException("Log file or index file does not exist");
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read database file", e);
+        }
+    }
+
+    private void configureParameters() {
+        // find last log offset in index file
+        try {
+            long lastLogOffset = Files.size(logFile);
+            long lastLogIndex = Files.size(indexFile) / Long.BYTES;
+            if (lastLogIndex > 0) {
+                lastLogOffset = indexOutputMemorySegment.get(
+                        ValueLayout.OfByte.JAVA_LONG_UNALIGNED,
+                        (lastLogIndex - 1) * Long.BYTES
+                );
+                var lastEntry = deserializeLogEntries(lastLogOffset, 1, false).getLast();
+                this.lastLogId = lastEntry.logId();
+                this.lastAppliedIndex = lastEntry.logId().index();
+            }
+            this.lastLogOffset = lastLogOffset;
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read index file", e);
+        }
+    }
+
+    private Path createLogFile(Path logDir) {
         for (int i = 0; i < 10; i++) {
             Path logFile = logDir.resolve("log-" + System.currentTimeMillis() + ".log");
             if (!Files.exists(logFile)) {
@@ -308,8 +407,11 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private Path createIndexFile() {
         Path indexFile;
         try {
-            indexFile = logFile.resolveSibling(STR."\{logFile.getFileName()}.index");
-        } catch (InvalidPathException e) {
+            String fileName = logFile.getFileName().toString();
+            String fileNameWithoutExtension = fileName.substring(0, fileName.lastIndexOf('.'));
+            indexFile = logFile.resolveSibling(STR."\{fileNameWithoutExtension}.index");
+            Files.createFile(indexFile);
+        } catch (InvalidPathException | IOException e) {
             throw new RuntimeException("Failed to create index file", e);
         }
         return indexFile;

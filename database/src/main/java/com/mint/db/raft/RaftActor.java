@@ -2,6 +2,7 @@ package com.mint.db.raft;
 
 import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
+import com.mint.db.dao.impl.StringDaoWrapper;
 import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
@@ -41,6 +42,7 @@ public class RaftActor implements RaftActorInterface {
     private final ScheduledExecutorService scheduledExecutor;
     private ScheduledFuture<?> scheduledFuture;
     private final ReplicatedLogManager<MemorySegment> replicatedLogManager;
+    private final StringDaoWrapper dao;
     private final NodeConfig config;
     private final AtomicBoolean amILeader = new AtomicBoolean();
     private int votedForMe = 0;
@@ -55,7 +57,8 @@ public class RaftActor implements RaftActorInterface {
 
     public RaftActor(InternalGrpcActorInterface internalGrpcActor, NodeConfig config, PersistentState state) {
         this.scheduledExecutor = Executors.newScheduledThreadPool(POOL_SIZE);
-        this.replicatedLogManager = new ReplicatedLogManagerImpl(config, state);
+        this.dao = new StringDaoWrapper();
+        this.replicatedLogManager = new ReplicatedLogManagerImpl(config, state, dao);
         this.config = config;
         this.internalGrpcActor = internalGrpcActor;
         this.nodeId = config.getNodeId();
