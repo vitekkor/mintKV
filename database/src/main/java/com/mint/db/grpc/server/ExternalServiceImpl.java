@@ -16,9 +16,9 @@ public class ExternalServiceImpl
         implements ExternalGrpcActorInterface {
     // TODO
     //     private final Map<Command, StreamObserver<?>> commandStreamObserverMap;
-    private final Map<String, ExternalGrpcClient> externalGrpcClients;
+    private final Map<Integer, ExternalGrpcClient> externalGrpcClients;
 
-    public ExternalServiceImpl(Map<String, ExternalGrpcClient> externalGrpcClients) {
+    public ExternalServiceImpl(Map<Integer, ExternalGrpcClient> externalGrpcClients) {
         this.externalGrpcClients = externalGrpcClients;
     }
 
