@@ -60,6 +60,7 @@ public class RaftActor implements RaftActorInterface {
     private int votedForMe = 0;
     private int leaderId = -1;
     private long nextTimeout = Long.MAX_VALUE;
+    private long[] nextIndex;
 
     public RaftActor(
             InternalGrpcActorInterface internalGrpcActor,
@@ -302,7 +303,11 @@ public class RaftActor implements RaftActorInterface {
             LogId lastLogId = replicatedLogManager.readLastLogId();
             OperationType operationType;
             if (command instanceof InsertCommand) {
-                operationType = OperationType.PUT;
+                if (command.value() == null) {
+                    operationType = OperationType.DELETE;
+                } else {
+                    operationType = OperationType.PUT;
+                }
             } else {
                 operationType = OperationType.GET;
             }
@@ -314,8 +319,6 @@ public class RaftActor implements RaftActorInterface {
                     entry,
                     new LogId(lastLogId.term(), lastLogId.index() + 1)
             );
-
-            long[] nextIndex = new long[config.getCluster().size()];
             for (int i = 0; i < nextIndex.length; i++) {
                 nextIndex[i] = replicatedLogManager.readLastLogId().index() + 1;
             }
@@ -331,8 +334,11 @@ public class RaftActor implements RaftActorInterface {
                         .addEntries(Raft.LogEntry.newBuilder()
                                 .setTerm(logEntry.logId().term())
                                 .setIndex(logEntry.logId().index())
-                                .setOperation(command instanceof InsertCommand
-                                        ? Raft.Operation.PUT : Raft.Operation.GET)
+                                .setOperation(operationType == OperationType.PUT
+                                        ? Raft.Operation.PUT
+                                        : operationType == OperationType.DELETE
+                                        ? Raft.Operation.DELETE
+                                        : Raft.Operation.GET)
                                 .setKey(ByteString.copyFromUtf8(command.key()))
                                 .setValue(ByteString.copyFromUtf8(command.value()))
                                 .build())
@@ -358,6 +364,7 @@ public class RaftActor implements RaftActorInterface {
         if (commandResult.term() > state.currentTerm()) {
             externalGrpcActorInterface.onClientCommandResult(command, commandResult);
             replicatedLogManager.writePersistentState(new PersistentState(commandResult.term()));
+            this.leaderId = leaderId;
             startTimeout(Timeout.ELECTION_TIMEOUT);
             while (!queue.isEmpty()) {
                 command = queue.poll();
