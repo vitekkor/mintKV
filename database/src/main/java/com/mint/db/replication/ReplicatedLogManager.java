@@ -4,6 +4,8 @@ import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.model.LogEntry;
 import com.mint.db.replication.model.PersistentState;
 
+import java.util.List;
+
 public interface ReplicatedLogManager<D> {
     /**
      * Reads {@link PersistentState} of the Raft algorithm.
@@ -25,7 +27,12 @@ public interface ReplicatedLogManager<D> {
     /**
      * Reads log entry at the specified index, return `null` if the entry is not present.
      */
-    LogEntry<D> readLog(long index);
+    default LogEntry<D> readLog(long index) {
+        List<LogEntry<D>> logEntries = readLog(index, index + 1);
+        return !logEntries.isEmpty() ? logEntries.getFirst() : null;
+    }
+
+    List<LogEntry<D>> readLog(long fromIndex, long toIndex);
 
     long commitIndex();
 

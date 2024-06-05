@@ -50,6 +50,7 @@ public class RaftActor implements RaftActorInterface {
     private final int nodeId;
     private final ScheduledExecutorService scheduledExecutor;
     private final ReplicatedLogManager<MemorySegment> replicatedLogManager;
+    private final StringDaoWrapper dao;
     private final NodeConfig config;
     private final AtomicBoolean amILeader = new AtomicBoolean();
     private final Queue<Command> queue = new ArrayDeque<>();
@@ -72,7 +73,8 @@ public class RaftActor implements RaftActorInterface {
     ) {
         this.externalGrpcActorInterface = externalGrpcActorInterface;
         this.scheduledExecutor = Executors.newScheduledThreadPool(POOL_SIZE);
-        this.replicatedLogManager = new ReplicatedLogManagerImpl(config, state);
+        this.dao = new StringDaoWrapper();
+        this.replicatedLogManager = new ReplicatedLogManagerImpl(config, state, dao);
         this.config = config;
         this.internalGrpcActor = internalGrpcActor;
         this.nodeId = config.getNodeId();

@@ -64,7 +64,7 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
         return oldEntry != null ? toBaseEntryString(oldEntry) : null;
     }
 
-    private BaseEntry<String> toBaseEntryString(Entry<MemorySegment> entry) {
+    public static BaseEntry<String> toBaseEntryString(Entry<MemorySegment> entry) {
         return new BaseEntry<>(
                 toString(entry.key()),
                 toString(entry.committedValue()),
@@ -73,7 +73,7 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
         );
     }
 
-    private BaseEntry<MemorySegment> toBaseEntryMemorySegment(Entry<String> entry) {
+    public static BaseEntry<MemorySegment> toBaseEntryMemorySegment(Entry<String> entry) {
         return new BaseEntry<>(
                 toMemorySegment(entry.key()),
                 toMemorySegment(entry.committedValue()),
