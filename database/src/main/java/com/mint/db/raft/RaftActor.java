@@ -1,6 +1,5 @@
 package com.mint.db.raft;
 
-import com.google.protobuf.ByteString;
 import com.mint.DatabaseServiceOuterClass;
 import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
