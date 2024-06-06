@@ -15,7 +15,7 @@ public interface ExternalGrpcActorInterface {
     void sendClientCommand(
             int destId,
             Command command,
-            BiConsumer<Integer, CommandResult> onCommandResult
+            BiConsumer<Command, CommandResult> onCommandResult
     );
 
     /**

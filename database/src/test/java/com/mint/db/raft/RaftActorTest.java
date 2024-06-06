@@ -2,7 +2,9 @@ package com.mint.db.raft;
 
 import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
+import com.mint.db.config.annotations.ExternalGrpcActorBean;
 import com.mint.db.grpc.InternalGrpcActor;
+import com.mint.db.grpc.server.ExternalServiceImpl;
 import com.mint.db.replication.model.PersistentState;
 import org.awaitility.Awaitility;
 import org.hamcrest.comparator.ComparatorMatcherBuilder;
@@ -49,6 +51,7 @@ class RaftActorTest {
         List<RaftActor> cluster = new ArrayList<>(5);
 
         InternalGrpcActor internalGrpcActor = Mockito.mock(InternalGrpcActor.class);
+        ExternalServiceImpl externalGrpcActor = Mockito.mock(ExternalServiceImpl.class);
         AtomicInteger internalGrpcActorInvocations = new AtomicInteger();
         Mockito.doAnswer(invocation -> {
             Raft.VoteRequest voteRequest = invocation.getArgument(0);
@@ -79,7 +82,12 @@ class RaftActorTest {
             nodeConfig.setPort(8080 + i);
             Mockito.when(nodeConfig.heartbeatRandom()).thenReturn(false);
 
-            RaftActor raftActor = new RaftActor(internalGrpcActor, nodeConfig, new PersistentState());
+            RaftActor raftActor = new RaftActor(
+                    internalGrpcActor,
+                    nodeConfig,
+                    new PersistentState(),
+                    externalGrpcActor
+            );
             cluster.add(raftActor);
         }
         //CHECKSTYLE.OFF: IndentationCheck

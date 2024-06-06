@@ -53,7 +53,7 @@ public class ExternalServiceImpl
     }
 
     @Override
-    public void sendClientCommand(int destId, Command command, BiConsumer<Integer, CommandResult> onCommandResult) {
+    public void sendClientCommand(int destId, Command command, BiConsumer<Command, CommandResult> onCommandResult) {
         // TODO send Command to destId async and call onCommandResult on response
     }
 

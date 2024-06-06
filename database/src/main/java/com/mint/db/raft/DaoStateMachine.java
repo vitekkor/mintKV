@@ -1,12 +1,18 @@
 package com.mint.db.raft;
 
+import com.mint.DatabaseServiceOuterClass.ReadMode;
 import com.mint.db.dao.Dao;
 import com.mint.db.dao.Entry;
 import com.mint.db.dao.impl.BaseEntry;
+import com.mint.db.dao.impl.StringDaoWrapper;
+import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
+import com.mint.db.raft.model.GetCommand;
 import com.mint.db.raft.model.GetCommandResult;
+import com.mint.db.raft.model.InsertCommand;
 import com.mint.db.raft.model.InsertCommandResult;
 import com.mint.db.replication.model.LogEntry;
+import com.mint.db.replication.model.PersistentState;
 import com.mint.db.replication.model.impl.OperationType;
 
 import java.lang.foreign.MemorySegment;
@@ -31,11 +37,15 @@ public class DaoStateMachine implements StateMachine<MemorySegment> {
         switch (operationType) {
             case OperationType.GET -> {
                 Entry<MemorySegment> entry = dao.get(logEntry.entry().key());
+                String entryValue = null;
+                if (entry != null) {
+                    entryValue = toString(committed ? entry.committedValue() : entry.readUncommittedValue());
+                }
 
                 commandResult = new GetCommandResult(
                         logEntry.logId().term(),
-                        toString(entry.key()),
-                        toString(entry.committedValue())
+                        toString(key),
+                        entryValue
                 );
             }
             case OperationType.PUT, OperationType.DELETE -> {
@@ -58,6 +68,44 @@ public class DaoStateMachine implements StateMachine<MemorySegment> {
         }
 
         return commandResult;
+    }
+
+    @Override
+    public CommandResult apply(Command command, long currentTerm) {
+        switch (command) {
+            case GetCommand getCommand -> {
+                Entry<MemorySegment> entry = dao.get(StringDaoWrapper.toMemorySegment(getCommand.key()));
+                String entryValue = null;
+                if (entry != null) {
+                    entryValue = toString(
+                            getCommand.readMode() == ReadMode.READ_COMMITTED
+                                    ? entry.committedValue()
+                                    : entry.readUncommittedValue()
+                    );
+                }
+
+                return new GetCommandResult(
+                        currentTerm,
+                        getCommand.key(),
+                        entryValue
+                );
+            }
+            case InsertCommand insertCommand -> {
+                MemorySegment committedValue = StringDaoWrapper.toMemorySegment(insertCommand.value());
+                MemorySegment key = StringDaoWrapper.toMemorySegment(insertCommand.key());
+
+                if (insertCommand.uncommitted()) {
+                    Entry<MemorySegment> oldEntry = dao.get(key);
+                    MemorySegment oldValue = oldEntry != null ? oldEntry.committedValue() : null;
+                    dao.upsert(new BaseEntry<>(key, oldValue, committedValue, true));
+                } else {
+                    dao.upsert(new BaseEntry<>(key, committedValue, null, false));
+                }
+
+                return new InsertCommandResult(currentTerm, toString(key));
+            }
+            case null -> throw new IllegalArgumentException("Command is null");
+        }
     }
 
     public static String toString(MemorySegment memorySegment) {
