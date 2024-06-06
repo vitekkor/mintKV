@@ -29,6 +29,7 @@ public class InternalGrpcClient implements Closeable {
         executor = Executors.newFixedThreadPool(N_THREADS);
         channel = Grpc.newChannelBuilder(url, InsecureChannelCredentials.create())
                 .executor(executor)
+                .keepAliveWithoutCalls(true)
                 .build();
 
         stub = RaftServiceGrpc.newStub(channel);

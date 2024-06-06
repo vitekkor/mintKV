@@ -1,6 +1,7 @@
 package com.mint.db.dao;
 
 import com.mint.db.config.ConfigParser;
+import com.mint.db.dao.impl.BaseDao;
 import com.mint.db.dao.impl.StringDaoWrapper;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
 import com.mint.db.replication.model.LogEntry;
@@ -25,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class ReplicatedLogManagerTest {
     private static ReplicatedLogManagerImpl createReplicatedLogManager() throws IOException {
-        return new ReplicatedLogManagerImpl(ConfigParser.parseConfig(), new PersistentState(), new StringDaoWrapper());
+        return new ReplicatedLogManagerImpl(ConfigParser.parseConfig(), new PersistentState(), new BaseDao());
     }
 
     @AfterEach

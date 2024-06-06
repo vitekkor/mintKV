@@ -2,7 +2,6 @@ package com.mint.db.raft;
 
 import com.mint.DatabaseServiceOuterClass;
 import com.mint.db.Raft;
-import com.mint.db.config.NodeConfig;
 import com.mint.db.dao.Entry;
 import com.mint.db.dao.impl.BaseEntry;
 import com.mint.db.dao.impl.StringDaoWrapper;
@@ -14,8 +13,6 @@ import com.mint.db.raft.model.GetCommand;
 import com.mint.db.raft.model.InsertCommand;
 import com.mint.db.raft.model.LogId;
 import com.mint.db.raft.model.Pair;
-import com.mint.db.replication.ReplicatedLogManager;
-import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
 import com.mint.db.replication.model.LogEntry;
 import com.mint.db.replication.model.PersistentState;
 import com.mint.db.replication.model.impl.BaseLogEntry;
@@ -40,18 +37,18 @@ import java.util.function.Consumer;
 import java.util.stream.IntStream;
 
 import static com.mint.db.util.LogUtil.protobufMessageToString;
+import static java.lang.Math.min;
 
 public class RaftActor implements RaftActorInterface {
     public static final String MDC_NODE_ID = "nodeId";
     private static final Logger logger = LoggerFactory.getLogger(RaftActor.class);
     private static final Random rand = new Random();
     private static final int POOL_SIZE = 1;
+    private static final LogId START_LOG_ID = new LogId(0, 0);
     private final InternalGrpcActorInterface internalGrpcActor;
+    private final Environment<MemorySegment> env;
     private final int nodeId;
     private final ScheduledExecutorService scheduledExecutor;
-    private final ReplicatedLogManager<MemorySegment> replicatedLogManager;
-    private final StringDaoWrapper dao;
-    private final NodeConfig config;
     private final Queue<Command> queue = new ArrayDeque<>();
     private final ExternalGrpcActorInterface externalGrpcActorInterface;
     private ScheduledFuture<?> scheduledFuture;
@@ -61,29 +58,25 @@ public class RaftActor implements RaftActorInterface {
     private final long[] nextIndex;
     private long lastApplied;
     private final long[] matchIndex;
-    private static final LogId START_LOG_ID = new LogId(0, 0);
-
-    private StateMachine<MemorySegment> stateMachine;
 
     public RaftActor(
             InternalGrpcActorInterface internalGrpcActor,
-            NodeConfig config,
-            PersistentState state,
+            Environment<MemorySegment> environment,
             ExternalGrpcActorInterface externalGrpcActorInterface
     ) {
+        this.internalGrpcActor = internalGrpcActor;
+        this.env = environment;
+
         this.externalGrpcActorInterface = externalGrpcActorInterface;
         this.scheduledExecutor = Executors.newScheduledThreadPool(POOL_SIZE);
-        this.dao = new StringDaoWrapper();
-        this.replicatedLogManager = new ReplicatedLogManagerImpl(config, state, dao);
-        this.config = config;
-        this.internalGrpcActor = internalGrpcActor;
-        this.nodeId = config.getNodeId();
-        this.lastApplied = replicatedLogManager.readLastLogId().index();
-        this.nextIndex = new long[config.getCluster().size()];
-        for (int i = 0; i < config.getCluster().size(); i++) {
-            nextIndex[i] = replicatedLogManager.readLastLogId().index() + 1;
+
+        this.nodeId = env.nodeId();
+        this.lastApplied = env.replicatedLogManager().readLastLogId().index();
+        this.nextIndex = new long[env.nProcesses()];
+        for (int i = 0; i < env.nProcesses(); i++) {
+            nextIndex[i] = env.replicatedLogManager().readLastLogId().index() + 1;
         }
-        this.matchIndex = new long[config.getCluster().size()];
+        this.matchIndex = new long[env.nProcesses()];
 
         startTimeout(Timeout.ELECTION_TIMEOUT);
     }
@@ -106,11 +99,11 @@ public class RaftActor implements RaftActorInterface {
         return Long.compare(logId.index(), otherLogId.index());
     }
 
-    private void startTimeout(Timeout timeout) {
-        long heartbeatTimeoutMs = config.getHeartbeatTimeoutMs();
-        int numberOfProcesses = Math.max(config.getCluster().size(), 2);
+    public void startTimeout(Timeout timeout) {
+        long heartbeatTimeoutMs = env.config().getHeartbeatTimeoutMs();
+        int numberOfProcesses = Math.max(env.nProcesses(), 2);
         this.nextTimeout = heartbeatTimeoutMs + switch (timeout) {
-            case ELECTION_TIMEOUT -> config.heartbeatRandom()
+            case ELECTION_TIMEOUT -> env.config().heartbeatRandom()
                     ? rand.nextLong(heartbeatTimeoutMs / numberOfProcesses, heartbeatTimeoutMs)
                     : nodeId * heartbeatTimeoutMs / numberOfProcesses;
             case LEADER_HEARTBEAT_PERIOD -> 0;
@@ -131,32 +124,32 @@ public class RaftActor implements RaftActorInterface {
     @Override
     public void onTimeout() {
         if (leaderId == nodeId) { // send heartbeat
-            PersistentState state = replicatedLogManager.readPersistentState();
-            for (int i = 0; i < config.getCluster().size(); i++) {
+            PersistentState state = env.replicatedLogManager().readPersistentState();
+            for (int i = 0; i < env.nProcesses(); i++) {
                 if (i != nodeId) {
                     // if follower lagging behind from our log
                     // then we send nextIndex entry to him
                     if (nextIndex[i] <= lastApplied) { // todo send batch
-                        LogId prevLogId = replicatedLogManager.readLog(nextIndex[i] - 1).logId();
-                        LogEntry<MemorySegment> nextEntry = replicatedLogManager.readLog(nextIndex[i]);
+                        LogId prevLogId = env.replicatedLogManager().readLog(nextIndex[i] - 1).logId();
+                        LogEntry<MemorySegment> nextEntry = env.replicatedLogManager().readLog(nextIndex[i]);
                         Raft.AppendEntriesRequest appendEntriesRequest = Raft.AppendEntriesRequest.newBuilder()
                                 .setTerm(state.currentTerm())
                                 .setLeaderId(nodeId)
                                 .setPrevLogIndex(prevLogId.index())
                                 .setPrevLogTerm(prevLogId.term())
                                 .setEntries(0, EntryConverter.logEntryToRaftLogEntry(nextEntry))
-                                .setLeaderCommit(replicatedLogManager.commitIndex())
+                                .setLeaderCommit(env.replicatedLogManager().commitIndex())
                                 .build();
                         internalGrpcActor.sendAppendEntriesRequest(i, appendEntriesRequest, this::onAppendEntryResult);
                         internalGrpcActor.sendAppendEntriesRequest(appendEntriesRequest, this::onAppendEntryResult);
                     } else {
-                        LogId logId = replicatedLogManager.readLastLogId();
+                        LogId logId = env.replicatedLogManager().readLastLogId();
                         Raft.AppendEntriesRequest appendEntriesRequest = Raft.AppendEntriesRequest.newBuilder()
                                 .setTerm(state.currentTerm())
                                 .setLeaderId(nodeId)
                                 .setPrevLogIndex(logId.index())
                                 .setPrevLogTerm(logId.term())
-                                .setLeaderCommit(replicatedLogManager.commitIndex())
+                                .setLeaderCommit(env.replicatedLogManager().commitIndex())
                                 .build();
                         internalGrpcActor.sendAppendEntriesRequest(i, appendEntriesRequest, this::onAppendEntryResult);
                     }
@@ -164,16 +157,16 @@ public class RaftActor implements RaftActorInterface {
             }
             startTimeout(Timeout.LEADER_HEARTBEAT_PERIOD);
         } else { // become a follower
-            PersistentState oldState = replicatedLogManager.readPersistentState();
+            PersistentState oldState = env.replicatedLogManager().readPersistentState();
 
             PersistentState state = new PersistentState(oldState.currentTerm() + 1, nodeId);
-            replicatedLogManager.writePersistentState(state);
+            env.replicatedLogManager().writePersistentState(state);
             votedForMe = 0;
             leaderId = -1;
 
             startTimeout(Timeout.ELECTION_TIMEOUT);
 
-            LogId lastLogId = replicatedLogManager.readLastLogId();
+            LogId lastLogId = env.replicatedLogManager().readLastLogId();
             Raft.VoteRequest voteRequest = Raft.VoteRequest.newBuilder()
                     .setCandidateId(nodeId)
                     .setTerm(state.currentTerm())
@@ -189,8 +182,8 @@ public class RaftActor implements RaftActorInterface {
             Raft.AppendEntriesRequest appendEntriesRequest,
             Consumer<Raft.AppendEntriesResponse> onVoteResponse
     ) {
-        PersistentState state = replicatedLogManager.readPersistentState();
-        LogId prevLogId = replicatedLogManager.readLastLogId();
+        PersistentState state = env.replicatedLogManager().readPersistentState();
+        LogId prevLogId = env.replicatedLogManager().readLastLogId();
 
         if (appendEntriesRequest.getTerm() < state.currentTerm()) { // reject obsolete messages
             Raft.AppendEntriesResponse appendEntriesResponse = Raft.AppendEntriesResponse.newBuilder()
@@ -211,7 +204,7 @@ public class RaftActor implements RaftActorInterface {
                     .setLastIndex(-1)
                     .build();
             onVoteResponse.accept(appendEntriesResponse);
-            replicatedLogManager.writePersistentState(new PersistentState(appendEntriesRequest.getTerm()));
+            env.replicatedLogManager().writePersistentState(new PersistentState(appendEntriesRequest.getTerm()));
             startTimeout(Timeout.ELECTION_TIMEOUT);
             return;
         }
@@ -238,7 +231,7 @@ public class RaftActor implements RaftActorInterface {
 
         if (appendEntriesResponse.getTerm() > state.currentTerm()) {
             // new leader is, our log is up-to-date, so we update our state
-            replicatedLogManager.writePersistentState(new PersistentState(appendEntriesRequest.getTerm()));
+            env.replicatedLogManager().writePersistentState(new PersistentState(appendEntriesRequest.getTerm()));
             leaderId = -1;
         }
 
@@ -252,16 +245,16 @@ public class RaftActor implements RaftActorInterface {
         }
         startTimeout(Timeout.ELECTION_TIMEOUT);
 
-        long lastCommitIndex = replicatedLogManager.commitIndex();
+        long lastCommitIndex = env.replicatedLogManager().commitIndex();
 
         // commit all entries that were appended by us and committed by leader
         if (appendEntriesRequest.getLeaderCommit() > lastCommitIndex) {
             long newCommitIndex
-                    = Math.min(appendEntriesRequest.getLeaderCommit(), replicatedLogManager.readLastLogId().index());
-            replicatedLogManager.setCommitIndex(newCommitIndex);
+                    = min(appendEntriesRequest.getLeaderCommit(), env.replicatedLogManager().readLastLogId().index());
+            env.replicatedLogManager().setCommitIndex(newCommitIndex);
             for (long i = lastCommitIndex + 1; i < newCommitIndex; i++) {
-                LogEntry<MemorySegment> logEntry = replicatedLogManager.readLog(i);
-                stateMachine.apply(logEntry, true);
+                LogEntry<MemorySegment> logEntry = env.replicatedLogManager().readLog(i);
+                env.stateMachine().apply(logEntry, true);
             }
         }
     }
@@ -271,13 +264,13 @@ public class RaftActor implements RaftActorInterface {
             PersistentState state,
             Consumer<Raft.AppendEntriesResponse> onVoteResponse
     ) {
-        long lastCommitIndex = replicatedLogManager.commitIndex();
+        long lastCommitIndex = env.replicatedLogManager().commitIndex();
         // commit all entries that were appended by us and committed by leader
         if (lastCommitIndex < appendEntriesRequest.getLeaderCommit()) {
-            long newCommitIndex = Math.min(lastApplied, appendEntriesRequest.getLeaderCommit());
+            long newCommitIndex = min(lastApplied, appendEntriesRequest.getLeaderCommit());
             for (long i = lastCommitIndex + 1; i < newCommitIndex; i++) {
-                LogEntry<MemorySegment> logEntry = replicatedLogManager.readLog(i);
-                stateMachine.apply(logEntry, true);
+                LogEntry<MemorySegment> logEntry = env.replicatedLogManager().readLog(i);
+                env.stateMachine().apply(logEntry, true);
             }
         }
 
@@ -286,14 +279,14 @@ public class RaftActor implements RaftActorInterface {
             PersistentState newState = new PersistentState(appendEntriesRequest.getTerm());
             Raft.AppendEntriesResponse appendEntriesResponse = Raft.AppendEntriesResponse.newBuilder()
                     .setTerm(newState.currentTerm())
-                    .setLastIndex(replicatedLogManager.readLastLogId().index())
+                    .setLastIndex(env.replicatedLogManager().readLastLogId().index())
                     .build();
             onVoteResponse.accept(appendEntriesResponse);
-            replicatedLogManager.writePersistentState(newState);
+            env.replicatedLogManager().writePersistentState(newState);
         } else { // just reply
             Raft.AppendEntriesResponse appendEntriesResponse = Raft.AppendEntriesResponse.newBuilder()
                     .setTerm(state.currentTerm())
-                    .setLastIndex(replicatedLogManager.readLastLogId().index())
+                    .setLastIndex(env.replicatedLogManager().readLastLogId().index())
                     .build();
             onVoteResponse.accept(appendEntriesResponse);
         }
@@ -307,7 +300,7 @@ public class RaftActor implements RaftActorInterface {
 
     @Override
     public void onAppendEntryResult(int srcId, Raft.AppendEntriesResponse appendEntriesResponse) {
-        PersistentState currentState = replicatedLogManager.readPersistentState();
+        PersistentState currentState = env.replicatedLogManager().readPersistentState();
 
         //ignore obsolete messages
         if (appendEntriesResponse.getTerm() < currentState.currentTerm()) {
@@ -317,7 +310,7 @@ public class RaftActor implements RaftActorInterface {
         //become a follower
         if (appendEntriesResponse.getTerm() > currentState.currentTerm()) {
             leaderId = -1;
-            replicatedLogManager.writePersistentState(new PersistentState(appendEntriesResponse.getTerm()));
+            env.replicatedLogManager().writePersistentState(new PersistentState(appendEntriesResponse.getTerm()));
             startTimeout(Timeout.ELECTION_TIMEOUT);
             return;
         }
@@ -337,7 +330,7 @@ public class RaftActor implements RaftActorInterface {
         matchIndex[srcId - 1] = messageLastIndex;
 
         //commit entries
-        for (long index = replicatedLogManager.commitIndex() + 1; index <= messageLastIndex; index++) {
+        for (long index = env.replicatedLogManager().commitIndex() + 1; index <= messageLastIndex; index++) {
             int nodesCount = 0;
             for (long i : matchIndex) {
                 if (i >= index) {
@@ -346,13 +339,13 @@ public class RaftActor implements RaftActorInterface {
             }
 
 
-            LogEntry<MemorySegment> logEntry = replicatedLogManager.readLog(index);
+            LogEntry<MemorySegment> logEntry = env.replicatedLogManager().readLog(index);
             boolean isLogTermEqualToCurrentTerm = logEntry != null && logEntry.logId().term() == state.currentTerm();
-            if (nodesCount >= quorum(config.getCluster().size()) && isLogTermEqualToCurrentTerm) {
+            if (nodesCount >= quorum(env.nProcesses()) && isLogTermEqualToCurrentTerm) {
                 Collection<Pair<Command, CommandResult>> leaderResults = new ArrayList<>();
 
-                for (long i = replicatedLogManager.commitIndex() + 1; i <= index; i++) {
-                    LogEntry<MemorySegment> logEntryMemorySegment = replicatedLogManager.readLog(index);
+                for (long i = env.replicatedLogManager().commitIndex() + 1; i <= index; i++) {
+                    LogEntry<MemorySegment> logEntryMemorySegment = env.replicatedLogManager().readLog(index);
                     Command command;
                     if (logEntryMemorySegment.operationType() == OperationType.GET) {
                         command = new GetCommand(
@@ -369,7 +362,7 @@ public class RaftActor implements RaftActorInterface {
                         );
                     }
 
-                    CommandResult commandResult = stateMachine.apply(command, state.currentTerm());
+                    CommandResult commandResult = env.stateMachine().apply(command, state.currentTerm());
                     if (leaderId == nodeId && logEntryMemorySegment.logId().term() == state.currentTerm()) {
                         leaderResults.add(new Pair<>(command, commandResult));
                     } else if (leaderId == nodeId && logEntryMemorySegment.logId().term() == state.currentTerm()) {
@@ -383,7 +376,7 @@ public class RaftActor implements RaftActorInterface {
                 }
 
                 //update commit index
-                replicatedLogManager.setCommitIndex(index);
+                env.replicatedLogManager().setCommitIndex(index);
             }
         }
     }
@@ -396,19 +389,19 @@ public class RaftActor implements RaftActorInterface {
             return;
         }
 
-        LogEntry<MemorySegment> logEntry = replicatedLogManager.readLog(nextIndex[srcId - 1]);
+        LogEntry<MemorySegment> logEntry = env.replicatedLogManager().readLog(nextIndex[srcId - 1]);
 
         long prevLogIndex = Math.max(nextIndex[srcId - 1] - 1, 0);
-        LogEntry<MemorySegment> prevLogEntry = replicatedLogManager.readLog(prevLogIndex);
+        LogEntry<MemorySegment> prevLogEntry = env.replicatedLogManager().readLog(prevLogIndex);
         Entry<MemorySegment> prevEntry = prevLogEntry.entry();
         LogId prevLogId = prevEntry != null ? prevLogEntry.logId() : START_LOG_ID;
 
         //RPC-запрос AppendEntriesRequest для узла srcIdс с целью синхронизации его лога с лидером
         Raft.AppendEntriesRequest appendEntriesRequest = Raft.AppendEntriesRequest.newBuilder()
-                .setTerm(replicatedLogManager.readPersistentState().currentTerm())
+                .setTerm(env.replicatedLogManager().readPersistentState().currentTerm())
                 .setPrevLogIndex(prevLogId.index())
                 .setPrevLogTerm(prevLogId.term())
-                .setLeaderCommit(replicatedLogManager.commitIndex())
+                .setLeaderCommit(env.replicatedLogManager().commitIndex())
                 .setLeaderId(nodeId)
                 .addEntries(EntryConverter.logEntryToRaftLogEntry(logEntry))
                 .build();
@@ -419,7 +412,7 @@ public class RaftActor implements RaftActorInterface {
         MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
         logger.info("Receive new VoteRequest {}", protobufMessageToString(voteRequest));
 
-        PersistentState state = replicatedLogManager.readPersistentState();
+        PersistentState state = env.replicatedLogManager().readPersistentState();
         // reject old term
         if (voteRequest.getTerm() < state.currentTerm()) {
             Raft.VoteResponse voteResponse = Raft.VoteResponse.newBuilder()
@@ -449,7 +442,7 @@ public class RaftActor implements RaftActorInterface {
         leaderId = -1;
         if (Objects.equals(state.votedFor(), voteRequest.getCandidateId())) {
             if (state.currentTerm() < voteRequest.getTerm()) {
-                replicatedLogManager.writePersistentState(
+                env.replicatedLogManager().writePersistentState(
                         new PersistentState(voteRequest.getTerm(), voteRequest.getCandidateId())
                 );
             }
@@ -462,13 +455,13 @@ public class RaftActor implements RaftActorInterface {
             return;
         }
 
-        LogId lastLogId = replicatedLogManager.readLastLogId();
+        LogId lastLogId = env.replicatedLogManager().readLastLogId();
 
         boolean isLogUpToDate
                 = compareIdLogs(voteRequest.getLastLogTerm(), voteRequest.getLastLogIndex(), lastLogId) >= 0;
 
         if (!isLogUpToDate) { // new term, but old log, so we reject vote request and update our term
-            replicatedLogManager.writePersistentState(new PersistentState(voteRequest.getTerm()));
+            env.replicatedLogManager().writePersistentState(new PersistentState(voteRequest.getTerm()));
             Raft.VoteResponse voteResponse = Raft.VoteResponse.newBuilder()
                     .setTerm(voteRequest.getTerm())
                     .setVoteGranted(false)
@@ -478,7 +471,7 @@ public class RaftActor implements RaftActorInterface {
             return;
         }
 
-        replicatedLogManager.writePersistentState(
+        env.replicatedLogManager().writePersistentState(
                 new PersistentState(voteRequest.getTerm(), voteRequest.getCandidateId())
         );
         Raft.VoteResponse voteResponse = Raft.VoteResponse.newBuilder()
@@ -495,20 +488,20 @@ public class RaftActor implements RaftActorInterface {
         MDC.put(MDC_NODE_ID, String.valueOf(nodeId));
         logger.info("Receive new VoteResponse {}", protobufMessageToString(voteResponse));
 
-        long currentTerm = replicatedLogManager.readPersistentState().currentTerm();
+        long currentTerm = env.replicatedLogManager().readPersistentState().currentTerm();
         if (voteResponse.getTerm() < currentTerm) {
             return; // ignore obsolete messages
         }
 
         if (voteResponse.getTerm() > currentTerm) {
             leaderId = -1;
-            replicatedLogManager.writePersistentState(new PersistentState(voteResponse.getTerm()));
+            env.replicatedLogManager().writePersistentState(new PersistentState(voteResponse.getTerm()));
             startTimeout(Timeout.ELECTION_TIMEOUT);
             return;
         }
         if (voteResponse.getVoteGranted()) {
             votedForMe++;
-            if (votedForMe == quorum(config.getCluster().size())) {
+            if (votedForMe == quorum(env.nProcesses())) {
                 leaderId = nodeId;
                 votedForMe = 0;
                 onTimeout();
@@ -522,11 +515,11 @@ public class RaftActor implements RaftActorInterface {
 
     @Override
     public void onClientCommandResult(Command command, CommandResult commandResult) {
-        PersistentState state = replicatedLogManager.readPersistentState();
+        PersistentState state = env.replicatedLogManager().readPersistentState();
         int leaderId = (int) command.processId();
         if (commandResult.term() > state.currentTerm()) {
             externalGrpcActorInterface.onClientCommandResult(command, commandResult);
-            replicatedLogManager.writePersistentState(new PersistentState(commandResult.term()));
+            env.replicatedLogManager().writePersistentState(new PersistentState(commandResult.term()));
             this.leaderId = leaderId;
             startTimeout(Timeout.ELECTION_TIMEOUT);
             while (!queue.isEmpty()) {
@@ -541,8 +534,8 @@ public class RaftActor implements RaftActorInterface {
     @Override
     public void onClientCommand(Command command) {
         if (leaderId == nodeId) {
-            PersistentState state = replicatedLogManager.readPersistentState();
-            LogId lastLogId = replicatedLogManager.readLastLogId();
+            PersistentState state = env.replicatedLogManager().readPersistentState();
+            LogId lastLogId = env.replicatedLogManager().readLastLogId();
             switch (command) {
                 case InsertCommand insertCommand -> handleInsertCommandAsLeader(insertCommand, state, lastLogId);
                 case GetCommand getCommand -> handleGetCommandAsLeader(getCommand, state, lastLogId);
@@ -560,7 +553,7 @@ public class RaftActor implements RaftActorInterface {
         LogEntry<MemorySegment> logEntry = createLogEntryFromEntry(operationType, entry, lastLogId);
 
         if (command.uncommitted()) {
-            CommandResult commandResult = stateMachine.apply(command, state.currentTerm());
+            CommandResult commandResult = env.stateMachine().apply(command, state.currentTerm());
             if (isClusterReadyToAcceptEntries(logEntry)) {
                 sendAppendEntriesRequest(state, logEntry, lastLogId);
             }
@@ -568,7 +561,7 @@ public class RaftActor implements RaftActorInterface {
         } else if (isClusterReadyToAcceptEntries(logEntry)) {
             sendAppendEntriesRequest(state, logEntry, lastLogId);
         }
-        replicatedLogManager.appendLogEntry(logEntry);
+        env.replicatedLogManager().appendLogEntry(logEntry);
     }
 
     private void handleGetCommandAsLeader(GetCommand command, PersistentState state, LogId lastLogId) {
@@ -585,11 +578,11 @@ public class RaftActor implements RaftActorInterface {
                 if (isClusterReadyToAcceptEntries(logEntry)) {
                     sendAppendEntriesRequest(state, logEntry, lastLogId);
                 }
-                replicatedLogManager.appendLogEntry(logEntry);
+                env.replicatedLogManager().appendLogEntry(logEntry);
             }
 
             case READ_LOCAL, READ_COMMITTED -> {
-                CommandResult commandResult = stateMachine.apply(command, state.currentTerm());
+                CommandResult commandResult = env.stateMachine().apply(command, state.currentTerm());
                 externalGrpcActorInterface.onClientCommandResult(command, commandResult);
             }
 
@@ -617,11 +610,11 @@ public class RaftActor implements RaftActorInterface {
     }
 
     private boolean isClusterReadyToAcceptEntries(LogEntry<MemorySegment> logEntry) {
-        int count = (int) IntStream.range(0, config.getCluster().size())
+        int count = (int) IntStream.range(0, env.nProcesses())
                 .filter(i -> i != nodeId && nextIndex[i] == logEntry.logId().index())
                 .count();
 
-        return count >= quorum(config.getCluster().size());
+        return count >= quorum(env.nProcesses());
     }
 
     private void sendAppendEntriesRequest(PersistentState state, LogEntry<MemorySegment> logEntry, LogId lastLogId) {
@@ -631,14 +624,14 @@ public class RaftActor implements RaftActorInterface {
                 .addEntries(EntryConverter.logEntryToRaftLogEntry(logEntry))
                 .setPrevLogIndex(lastLogId.index())
                 .setPrevLogTerm(lastLogId.term())
-                .setLeaderCommit(replicatedLogManager.commitIndex())
+                .setLeaderCommit(env.replicatedLogManager().commitIndex())
                 .build();
         internalGrpcActor.sendAppendEntriesRequest(appendEntriesRequest, this::onAppendEntryResult);
     }
 
     private void appendEntitiesIntoLog(Raft.AppendEntriesRequest request) {
         for (Raft.LogEntry entry : request.getEntriesList()) {
-            replicatedLogManager.appendLogEntry(BaseLogEntry.valueOf(entry));
+            env.replicatedLogManager().appendLogEntry(BaseLogEntry.valueOf(entry));
         }
     }
 }

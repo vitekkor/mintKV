@@ -4,6 +4,7 @@ import com.google.protobuf.gradle.proto
 plugins {
     `java-configuration`
     id("com.google.protobuf") version "0.9.4"
+    kotlin("jvm")
 }
 
 repositories {
@@ -31,6 +32,7 @@ dependencies {
     testImplementation("org.powermock:powermock-module-junit4:2.0.9")
     testImplementation("org.powermock:powermock-api-mockito2:2.0.9")
     testImplementation("org.awaitility:awaitility:4.2.1")
+    implementation(kotlin("stdlib-jdk8"))
 
 }
 
@@ -70,4 +72,7 @@ sourceSets {
 
 tasks.test {
     testLogging.showStandardStreams = true
+}
+kotlin {
+    jvmToolchain(21)
 }
