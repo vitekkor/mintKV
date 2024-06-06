@@ -3,7 +3,6 @@ package com.mint.db.grpc.server;
 import com.google.inject.Inject;
 import com.mint.db.Raft;
 import com.mint.db.RaftServiceGrpc;
-import com.mint.db.raft.RaftActor;
 import com.mint.db.raft.RaftActorInterface;
 import io.grpc.stub.StreamObserver;
 

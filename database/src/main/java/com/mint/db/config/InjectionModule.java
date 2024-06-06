@@ -48,9 +48,10 @@ public class InjectionModule extends AbstractModule {
     @Provides
     @ExternalGrpcActorBean
     static ExternalServiceImpl provideExternalGrpcActorInterface(
-            @ExternalClientsBean Map<Integer, ExternalGrpcClient> externalGrpcClients
+            @NodeConfiguration NodeConfig nodeConfig,
+            @RaftActorBean RaftActor raftActor
     ) {
-        return new ExternalServiceImpl(externalGrpcClients);
+        return new ExternalServiceImpl(nodeConfig, raftActor);
     }
 
 

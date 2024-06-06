@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package com.mint.db;
 
+import "external/database_service.proto";
+
 enum Operation {
   UNDEFINED = 0;
   GET = 1;
@@ -45,8 +47,23 @@ message AppendEntriesResponse {
   int64 lastIndex = 2;
 }
 
+message ClientCommandRequestRPC {
+  int32 processId = 1;
+  bytes key = 2;
+  bytes value = 3;
+  Operation operation = 4;
+  ReadMode readMode = 5;
+  bool uncommitted = 6;
+}
+
+message ClientCommandResponseRPC {
+  int64 term = 1;
+  bytes key = 2;
+  bytes value = 3;
+}
 
 service RaftService {
   rpc RequestVote(VoteRequest) returns (VoteResponse) {}
   rpc AppendEntries(AppendEntriesRequest) returns (AppendEntriesResponse) {}
+  rpc ClientCommand(ClientCommandRequestRPC) returns (ClientCommandResponseRPC) {}
 }
