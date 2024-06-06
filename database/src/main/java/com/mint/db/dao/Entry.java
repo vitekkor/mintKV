@@ -8,4 +8,8 @@ public interface Entry<D> {
     D uncommittedValue();
 
     boolean uncommittedValueIsNotNull();
+
+    default D readUncommittedValue() {
+        return uncommittedValueIsNotNull() ? uncommittedValue() : committedValue();
+    }
 }

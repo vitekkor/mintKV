@@ -1,6 +1,5 @@
 package com.mint.db.raft;
 
-import com.mint.DatabaseServiceOuterClass;
 import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.dao.Entry;
@@ -11,9 +10,7 @@ import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
 import com.mint.db.raft.model.GetCommand;
-import com.mint.db.raft.model.GetCommandResult;
 import com.mint.db.raft.model.InsertCommand;
-import com.mint.db.raft.model.InsertCommandResult;
 import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
@@ -52,7 +49,6 @@ public class RaftActor implements RaftActorInterface {
     private final ReplicatedLogManager<MemorySegment> replicatedLogManager;
     private final StringDaoWrapper dao;
     private final NodeConfig config;
-    private final AtomicBoolean amILeader = new AtomicBoolean();
     private final Queue<Command> queue = new ArrayDeque<>();
     private final ExternalGrpcActorInterface externalGrpcActorInterface;
     private ScheduledFuture<?> scheduledFuture;
@@ -86,13 +82,6 @@ public class RaftActor implements RaftActorInterface {
         this.matchIndex = new long[config.getCluster().size()];
 
         startTimeout(Timeout.ELECTION_TIMEOUT);
-    }
-
-    private static int comparePrevLogs(long term, long index, LogId logId) {
-        if (term != logId.term()) {
-            return Long.compare(term, logId.term());
-        }
-        return Long.compare(index, logId.index());
     }
 
     private static int quorum(final int clusterSize) {
@@ -430,24 +419,6 @@ public class RaftActor implements RaftActorInterface {
     }
 
     @Override
-    public void onClientCommand(Command command) {
-        if (leaderId == nodeId) {
-            PersistentState state = replicatedLogManager.readPersistentState();
-            LogId lastLogId = replicatedLogManager.readLastLogId();
-
-            if (command instanceof InsertCommand) {
-                handleInsertCommandAsLeader((InsertCommand) command, state, lastLogId);
-            } else {
-                handleGetCommandAsLeader((GetCommand) command, state, lastLogId);
-            }
-        } else if (leaderId != -1) {
-            externalGrpcActorInterface.sendClientCommand(leaderId, command, this::onClientCommandResult);
-        } else {
-            queue.add(command);
-        }
-    }
-
-    @Override
     public void onClientCommandResult(Command command, CommandResult commandResult) {
         PersistentState state = replicatedLogManager.readPersistentState();
         int leaderId = (int) command.processId();
@@ -465,60 +436,71 @@ public class RaftActor implements RaftActorInterface {
         }
     }
 
+    @Override
+    public void onClientCommand(Command command) {
+        if (leaderId == nodeId) {
+            PersistentState state = replicatedLogManager.readPersistentState();
+            LogId lastLogId = replicatedLogManager.readLastLogId();
+            switch (command) {
+                case InsertCommand insertCommand -> handleInsertCommandAsLeader(insertCommand, state, lastLogId);
+                case GetCommand getCommand -> handleGetCommandAsLeader(getCommand, state, lastLogId);
+            }
+        } else if (leaderId != -1) {
+            externalGrpcActorInterface.sendClientCommand(leaderId, command, this::onClientCommandResult);
+        } else {
+            queue.add(command);
+        }
+    }
+
     private void handleInsertCommandAsLeader(InsertCommand command, PersistentState state, LogId lastLogId) {
         OperationType operationType = command.value() == null ? OperationType.DELETE : OperationType.PUT;
-        Entry<MemorySegment> entry = createEntryFromCommand(command);
+        Entry<MemorySegment> entry = createEntryFromInsertCommand(command);
         LogEntry<MemorySegment> logEntry = createLogEntryFromEntry(operationType, entry, lastLogId);
 
         if (command.uncommitted()) {
-            dao.upsert(StringDaoWrapper.toBaseEntryString(entry));
-            updateNextIndex();
-            if (isQuorumReached(logEntry)) {
-                sendAppendEntriesRequest(state, logEntry, lastLogId);
-                externalGrpcActorInterface.onClientCommandResult(
-                        command, new InsertCommandResult(state.currentTerm(), command.key())
-                );
-            }
-        } else if (!command.uncommitted()) {
-            updateNextIndex();
-            if (isQuorumReached(logEntry)) {
+            CommandResult commandResult = stateMachine.apply(command, state.currentTerm());
+            if (isClusterReadyToAcceptEntries(logEntry)) {
                 sendAppendEntriesRequest(state, logEntry, lastLogId);
             }
+            externalGrpcActorInterface.onClientCommandResult(command, commandResult);
+        } else if (isClusterReadyToAcceptEntries(logEntry)) {
+            sendAppendEntriesRequest(state, logEntry, lastLogId);
         }
+        replicatedLogManager.appendLogEntry(logEntry);
     }
 
     private void handleGetCommandAsLeader(GetCommand command, PersistentState state, LogId lastLogId) {
-        if (command.readMode() == DatabaseServiceOuterClass.ReadMode.READ_CONSENSUS) {
-            Entry<MemorySegment> entry = new BaseEntry<>(
-                    StringDaoWrapper.toMemorySegment(command.key()),
-                    StringDaoWrapper.toMemorySegment(command.value()),
-                    StringDaoWrapper.toMemorySegment(command.value()),
-                    false
-            );
-            LogEntry<MemorySegment> logEntry = createLogEntryFromEntry(OperationType.GET, entry, lastLogId);
+        switch (command.readMode()) {
+            case READ_CONSENSUS -> {
+                Entry<MemorySegment> entry = new BaseEntry<>(
+                        StringDaoWrapper.toMemorySegment(command.key()),
+                        StringDaoWrapper.toMemorySegment(command.value()),
+                        StringDaoWrapper.toMemorySegment(command.value()),
+                        false
+                );
+                LogEntry<MemorySegment> logEntry = createLogEntryFromEntry(OperationType.GET, entry, lastLogId);
 
-            updateNextIndex();
-
-            if (isQuorumReached(logEntry)) {
-                sendAppendEntriesRequest(state, logEntry, lastLogId);
+                if (isClusterReadyToAcceptEntries(logEntry)) {
+                    sendAppendEntriesRequest(state, logEntry, lastLogId);
+                }
+                replicatedLogManager.appendLogEntry(logEntry);
             }
-        } else if (command.readMode() == DatabaseServiceOuterClass.ReadMode.READ_LOCAL) {
-            handleNonConsensusGetCommand(command, state);
-        } else if (command.readMode() == DatabaseServiceOuterClass.ReadMode.READ_COMMITTED) {
-            Entry<MemorySegment> entry = createEntryFromCommand(command);
-            dao.get(entry.committedValue().toString());
-            externalGrpcActorInterface.onClientCommandResult(command, new GetCommandResult(
-                    state.currentTerm(), command.key(), command.value())
-            );
+
+            case READ_LOCAL, READ_COMMITTED -> {
+                CommandResult commandResult = stateMachine.apply(command, state.currentTerm());
+                externalGrpcActorInterface.onClientCommandResult(command, commandResult);
+            }
+
+            case UNRECOGNIZED -> throw new IllegalArgumentException("UNRECOGNIZED readMode");
         }
     }
 
-    private Entry<MemorySegment> createEntryFromCommand(Command command) {
+    private Entry<MemorySegment> createEntryFromInsertCommand(InsertCommand command) {
         return new BaseEntry<>(
                 StringDaoWrapper.toMemorySegment(command.key()),
                 StringDaoWrapper.toMemorySegment(command.value()),
                 StringDaoWrapper.toMemorySegment(command.value()),
-                true
+                command.uncommitted()
         );
     }
 
@@ -532,13 +514,7 @@ public class RaftActor implements RaftActorInterface {
         );
     }
 
-    private void updateNextIndex() {
-        for (int i = 0; i < nextIndex.length; i++) {
-            nextIndex[i] = replicatedLogManager.readLastLogId().index() + 1;
-        }
-    }
-
-    private boolean isQuorumReached(LogEntry<MemorySegment> logEntry) {
+    private boolean isClusterReadyToAcceptEntries(LogEntry<MemorySegment> logEntry) {
         int count = (int) IntStream.range(0, config.getCluster().size())
                 .filter(i -> i != nodeId && nextIndex[i] == logEntry.logId().index())
                 .count();
@@ -556,16 +532,6 @@ public class RaftActor implements RaftActorInterface {
                 .setLeaderCommit(replicatedLogManager.commitIndex())
                 .build();
         internalGrpcActor.sendAppendEntriesRequest(appendEntriesRequest, this::onAppendEntryResult);
-        replicatedLogManager.appendLogEntry(logEntry);
-        replicatedLogManager.setCommitIndex(logEntry.logId().index());
-    }
-
-    private void handleNonConsensusGetCommand(GetCommand command, PersistentState state) {
-        Entry<MemorySegment> entry = createEntryFromCommand(command);
-        dao.get((entry.uncommittedValueIsNotNull() ? entry.uncommittedValue() : entry.committedValue()).toString());
-        externalGrpcActorInterface.onClientCommandResult(
-                command, new GetCommandResult(state.currentTerm(), command.key(), command.value())
-        );
     }
 
     private void appendEntitiesIntoLog(Raft.AppendEntriesRequest request) {
