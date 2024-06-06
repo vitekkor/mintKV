@@ -2,6 +2,7 @@ package com.mint.db.grpc;
 
 import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
+import io.grpc.stub.StreamObserver;
 
 public interface ExternalGrpcActorInterface {
     /**
@@ -13,4 +14,6 @@ public interface ExternalGrpcActorInterface {
             Command command,
             CommandResult commandResult
     );
+
+    void addClientCommandCallback(Command command, StreamObserver<?> responseObserver);
 }

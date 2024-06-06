@@ -27,7 +27,7 @@ public class Server {
         this.grpcServer = ServerBuilder
                 .forPort(config.getPort())
                 .addService(externalService)
-                .addService(new InternalServiceImpl(raftActor))
+                .addService(new InternalServiceImpl(raftActor, externalService))
                 .build();
     }
 

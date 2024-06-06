@@ -2,10 +2,11 @@ package com.mint.db.raft.mock
 
 import com.mint.db.dao.impl.BaseEntry
 import com.mint.db.dao.impl.StringDaoWrapper
-import com.mint.db.raft.Environment
+import com.mint.db.raft.model.Command
 import com.mint.db.raft.model.InsertCommand
 import com.mint.db.raft.model.InsertCommandResult
 import com.mint.db.raft.model.LogId
+import com.mint.db.replication.model.LogEntry
 import com.mint.db.replication.model.impl.BaseLogEntry
 import com.mint.db.replication.model.impl.OperationType
 import java.lang.foreign.MemorySegment
@@ -31,7 +32,10 @@ fun Random.nextMemorySegment() = StringDaoWrapper.toMemorySegment(randomStrings.
 fun Random.nextCommand(processId: Long) =
     InsertCommand(processId, nextString(), nextString(), false)
 
-fun Random.nextCommandResult() = InsertCommandResult(nextCommandId(), nextString())
+fun Random.nextCommand(processId: Int) =
+    InsertCommand(processId.toLong(), nextString(), nextString(), false)
+
+fun Random.nextCommandResult(term: Long) = InsertCommandResult(term, nextString())
 
 fun Random.nextCommandId() = nextLong(10L..99L)
 
@@ -46,3 +50,16 @@ fun Random.nextLogEntry(index: Long, term: Long) =
         ),
         LogId(index, term)
     )
+
+fun Command.toLogEntry(logId: LogId): LogEntry<MemorySegment> {
+    return BaseLogEntry(
+        OperationType.PUT,
+        BaseEntry(
+            StringDaoWrapper.toMemorySegment(key()),
+            StringDaoWrapper.toMemorySegment(value()),
+            null,
+            false
+        ),
+        logId
+    )
+}
