@@ -34,6 +34,76 @@ public class InternalGrpcClient implements Closeable {
         stub = RaftServiceGrpc.newStub(channel);
     }
 
+    public void get(
+            Raft.ClientCommandRequestRPC commandRequestRPC,
+            TsiFrameProtector.Consumer<Raft.ClientCommandResponseRPC> onRequestResult
+    ) {
+        logger.debug("Get request {}", LogUtil.protobufMessageToString(commandRequestRPC));
+        stub.clientCommand(commandRequestRPC, new StreamObserver<>() {
+
+            @Override
+            public void onNext(Raft.ClientCommandResponseRPC clientCommandResponseRPC) {
+                onRequestResult.accept(clientCommandResponseRPC);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                logger.warn("Get request failed", t);
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.debug("Get request completed");
+            }
+        });
+    }
+
+    public void insert(
+            Raft.ClientCommandRequestRPC commandRequestRPC,
+            TsiFrameProtector.Consumer<Raft.ClientCommandResponseRPC> onInsertResult
+    ) {
+        logger.debug("Insert request {}", LogUtil.protobufMessageToString(commandRequestRPC));
+        stub.clientCommand(commandRequestRPC, new StreamObserver<>() {
+            @Override
+            public void onNext(Raft.ClientCommandResponseRPC clientCommandResponseRPC) {
+                onInsertResult.accept(clientCommandResponseRPC);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                logger.warn("Insert request failed", t);
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.debug("Insert request completed");
+            }
+        });
+    }
+
+    public void delete(
+            Raft.ClientCommandRequestRPC commandRequestRPC,
+            TsiFrameProtector.Consumer<Raft.ClientCommandResponseRPC> onDeleteResult
+    ) {
+        logger.debug("Delete request {}", LogUtil.protobufMessageToString(commandRequestRPC));
+        stub.clientCommand(commandRequestRPC, new StreamObserver<>() {
+            @Override
+            public void onNext(Raft.ClientCommandResponseRPC clientCommandResponseRPC) {
+                onDeleteResult.accept(clientCommandResponseRPC);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                logger.warn("Delete request failed", t);
+            }
+
+            @Override
+            public void onCompleted() {
+                logger.debug("Delete request completed");
+            }
+        });
+    }
+
     public void requestVote(
             Raft.VoteRequest voteRequest,
             TsiFrameProtector.Consumer<Raft.VoteResponse> onRequestVoteResult

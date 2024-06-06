@@ -2,13 +2,7 @@ package com.mint.db.config;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
-import com.mint.db.config.annotations.ExternalClientsBean;
-import com.mint.db.config.annotations.ExternalGrpcActorBean;
-import com.mint.db.config.annotations.InternalClientsBean;
-import com.mint.db.config.annotations.InternalGrpcActorBean;
-import com.mint.db.config.annotations.NodeConfiguration;
-import com.mint.db.config.annotations.PersistentStateBean;
-import com.mint.db.config.annotations.RaftActorBean;
+import com.mint.db.config.annotations.*;
 import com.mint.db.grpc.ExternalGrpcActorInterface;
 import com.mint.db.grpc.InternalGrpcActor;
 import com.mint.db.grpc.InternalGrpcActorInterface;
@@ -48,9 +42,10 @@ public class InjectionModule extends AbstractModule {
     @Provides
     @ExternalGrpcActorBean
     static ExternalServiceImpl provideExternalGrpcActorInterface(
-            @ExternalClientsBean Map<Integer, ExternalGrpcClient> externalGrpcClients
+            @NodeConfiguration NodeConfig nodeConfig,
+            @RaftActorBean RaftActor raftActor
     ) {
-        return new ExternalServiceImpl(externalGrpcClients);
+        return new ExternalServiceImpl(nodeConfig, raftActor);
     }
 
 

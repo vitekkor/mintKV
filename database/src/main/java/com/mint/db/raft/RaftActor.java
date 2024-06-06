@@ -7,11 +7,7 @@ import com.mint.db.dao.impl.BaseEntry;
 import com.mint.db.dao.impl.StringDaoWrapper;
 import com.mint.db.grpc.ExternalGrpcActorInterface;
 import com.mint.db.grpc.InternalGrpcActorInterface;
-import com.mint.db.raft.model.Command;
-import com.mint.db.raft.model.CommandResult;
-import com.mint.db.raft.model.GetCommand;
-import com.mint.db.raft.model.InsertCommand;
-import com.mint.db.raft.model.LogId;
+import com.mint.db.raft.model.*;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
 import com.mint.db.replication.model.LogEntry;
@@ -54,9 +50,9 @@ public class RaftActor implements RaftActorInterface {
     private int votedForMe = 0;
     private int leaderId = -1;
     private long nextTimeout = Long.MAX_VALUE;
-    private long[] nextIndex;
+    private final long[] nextIndex;
     private long lastApplied;
-    private long[] matchIndex;
+    private final long[] matchIndex;
 
     private StateMachine<MemorySegment> stateMachine;
 
@@ -428,7 +424,7 @@ public class RaftActor implements RaftActorInterface {
             startTimeout(Timeout.ELECTION_TIMEOUT);
             while (!queue.isEmpty()) {
                 command = queue.poll();
-                externalGrpcActorInterface.sendClientCommand(leaderId, command, this::onClientCommandResult);
+                internalGrpcActor.sendClientCommand(leaderId, command, this::onClientCommandResult);
             }
         } else {
             externalGrpcActorInterface.onClientCommandResult(command, commandResult);
@@ -445,7 +441,7 @@ public class RaftActor implements RaftActorInterface {
                 case GetCommand getCommand -> handleGetCommandAsLeader(getCommand, state, lastLogId);
             }
         } else if (leaderId != -1) {
-            externalGrpcActorInterface.sendClientCommand(leaderId, command, this::onClientCommandResult);
+            internalGrpcActor.sendClientCommand(leaderId, command, this::onClientCommandResult);
         } else {
             queue.add(command);
         }
