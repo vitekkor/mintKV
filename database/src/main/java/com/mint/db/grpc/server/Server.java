@@ -6,7 +6,6 @@ import com.mint.db.config.annotations.ExternalGrpcActorBean;
 import com.mint.db.config.annotations.NodeConfiguration;
 import com.mint.db.config.annotations.RaftActorBean;
 import com.mint.db.exceptions.ServerStartupException;
-import com.mint.db.raft.RaftActor;
 import com.mint.db.raft.RaftActorInterface;
 import io.grpc.ServerBuilder;
 import org.slf4j.Logger;

@@ -3,7 +3,12 @@ package com.mint.db.grpc;
 import com.google.protobuf.ByteString;
 import com.mint.db.Raft;
 import com.mint.db.grpc.client.InternalGrpcClient;
-import com.mint.db.raft.model.*;
+import com.mint.db.raft.model.Command;
+import com.mint.db.raft.model.CommandResult;
+import com.mint.db.raft.model.GetCommand;
+import com.mint.db.raft.model.GetCommandResult;
+import com.mint.db.raft.model.InsertCommand;
+import com.mint.db.raft.model.InsertCommandResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
