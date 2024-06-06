@@ -66,10 +66,6 @@ public class ExternalServiceImpl
         raftActor.onClientCommand(command);
     }
 
-    /**
-     * @param command
-     * @param commandResult result of applying client command
-     */
     @Override
     public void onClientCommandResult(Command command, CommandResult commandResult) {
         StreamObserver<?> responseObserver = commandStreamObserverMap.remove(command);

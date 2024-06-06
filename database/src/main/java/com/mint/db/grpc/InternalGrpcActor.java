@@ -95,7 +95,11 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
         }
     }
 
-    private void sendGetCommand(InternalGrpcClient client, GetCommand command, BiConsumer<Command, CommandResult> onCommandResult) {
+    private void sendGetCommand(
+            InternalGrpcClient client,
+            GetCommand command,
+            BiConsumer<Command, CommandResult> onCommandResult
+    ) {
         Raft.ClientCommandRequestRPC commandRequestRPC = Raft.ClientCommandRequestRPC.newBuilder()
                 .setOperation(GET)
                 .setKey(ByteString.copyFromUtf8(command.key()))
@@ -104,12 +108,20 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
                 .build();
         client.get(commandRequestRPC, response -> {
             logger.debug("Get command result received for key: {}", command.key());
-            GetCommandResult result = new GetCommandResult(response.getTerm(), command.key(), response.getValue().toStringUtf8());
+            GetCommandResult result = new GetCommandResult(
+                    response.getTerm(),
+                    command.key(),
+                    response.getValue().toStringUtf8()
+            );
             onCommandResult.accept(command, result);
         });
     }
 
-    private void sendInsertCommand(InternalGrpcClient client, InsertCommand command, BiConsumer<Command, CommandResult> onCommandResult) {
+    private void sendInsertCommand(
+            InternalGrpcClient client,
+            InsertCommand command,
+            BiConsumer<Command, CommandResult> onCommandResult
+    ) {
         Raft.ClientCommandRequestRPC commandRequestRPC = Raft.ClientCommandRequestRPC.newBuilder()
                 .setOperation(PUT)
                 .setKey(ByteString.copyFromUtf8(command.key()))
@@ -124,7 +136,11 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
         });
     }
 
-    private void sendDeleteCommand(InternalGrpcClient client, InsertCommand command, BiConsumer<Command, CommandResult> onCommandResult) {
+    private void sendDeleteCommand(
+            InternalGrpcClient client,
+            InsertCommand command,
+            BiConsumer<Command, CommandResult> onCommandResult
+    ) {
         Raft.ClientCommandRequestRPC commandRequestRPC = Raft.ClientCommandRequestRPC.newBuilder()
                 .setOperation(DELETE)
                 .setKey(ByteString.copyFromUtf8(command.key()))
