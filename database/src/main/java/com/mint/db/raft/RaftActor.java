@@ -32,7 +32,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.stream.IntStream;
 
@@ -491,7 +490,7 @@ public class RaftActor implements RaftActorInterface {
                 externalGrpcActorInterface.onClientCommandResult(command, commandResult);
             }
 
-            case UNRECOGNIZED -> throw new IllegalArgumentException("UNRECOGNIZED readMode");
+            default -> throw new IllegalArgumentException("UNRECOGNIZED readMode");
         }
     }
 
