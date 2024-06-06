@@ -15,7 +15,9 @@ import org.slf4j.LoggerFactory;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
-import static com.mint.db.Raft.Operation.*;
+import static com.mint.db.Raft.Operation.DELETE;
+import static com.mint.db.Raft.Operation.GET;
+import static com.mint.db.Raft.Operation.PUT;
 
 public class InternalGrpcActor implements InternalGrpcActorInterface {
     private static final Logger logger = LoggerFactory.getLogger(InternalGrpcClient.class);
