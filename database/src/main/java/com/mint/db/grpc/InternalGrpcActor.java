@@ -118,7 +118,7 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
             GetCommandResult result = new GetCommandResult(
                     response.getTerm(),
                     command.key(),
-                    response.getValue().toStringUtf8()
+                    response.getValue() != null ? response.getValue().toStringUtf8() : null
             );
             onCommandResult.accept(command, result);
         });
