@@ -11,6 +11,7 @@ import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
 import com.mint.db.raft.model.GetCommand;
 import com.mint.db.raft.model.InsertCommand;
+import com.mint.db.raft.model.InsertCommandResult;
 import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
@@ -25,6 +26,8 @@ import org.slf4j.MDC;
 
 import java.lang.foreign.MemorySegment;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Random;
@@ -302,14 +305,85 @@ public class RaftActor implements RaftActorInterface {
 
     @Override
     public void onAppendEntryResult(int srcId, Raft.AppendEntriesResponse appendEntriesResponse) {
-        // TODO
-        //     1. readPersistentState
-        //     2. ignore obsolete messages (appendEntriesResponse.getTerm() < state.currentTerm() -> return)
-        //     3. become a follower if  appendEntriesResponse.getTerm() > state.currentTerm() -> update PersistentState
-        //       (leaderId = -1, storage.writePersistentState(PersistentState(message.term))
-        //            env.startTimeout(Timeout.ELECTION_TIMEOUT))
-        //     4.
+        PersistentState currentState = replicatedLogManager.readPersistentState();
 
+        //ignore obsolete messages
+        if (appendEntriesResponse.getTerm() < currentState.currentTerm()) {
+            return;
+        }
+
+        //become a follower
+        if (appendEntriesResponse.getTerm() > currentState.currentTerm()) {
+            synchronized (replicatedLogManager) {
+                leaderId = -1;
+                replicatedLogManager.writePersistentState(new PersistentState(appendEntriesResponse.getTerm()));
+            }
+            startTimeout(Timeout.ELECTION_TIMEOUT);
+        }
+
+        //handle result
+        boolean success = appendEntriesResponse.getLastIndex() != -1;
+        if (success) {
+            onSuccessfullAppendEntryResult(srcId, appendEntriesResponse.getLastIndex(), currentState);
+        } else {
+            onFailedAppendEntryResult(srcId);
+        }
+    }
+
+    private void onSuccessfullAppendEntryResult(int srcId, long messageLastIndex, PersistentState state) {
+        //TODO update indexes - немного не понял как это сделать
+
+        //check if current node is leader
+        if (leaderId == nodeId) {
+            //commit entries
+            for (long index = replicatedLogManager.commitIndex() + 1; index < messageLastIndex; index++) {
+                int nodesCount = 0;
+                for (long i : matchIndex) {
+                    if (i >= index) {
+                        nodesCount++;
+                    }
+                }
+
+                Collection<CommandResult> leaderResults = new ArrayList<>();
+                if (nodesCount >= quorum(config.getCluster().size()) && replicatedLogManager.readLog(index).logId().term() == state.currentTerm()) {
+                    for (long i = replicatedLogManager.commitIndex() + 1; i < index; i++) {
+                        Command command = new InsertCommand(
+                                /*fixme what a parameter must to be here (long processId) ???*/ 0L,
+                                StringDaoWrapper.toString(replicatedLogManager.readLog(index).entry().key()),
+                                StringDaoWrapper.toString(replicatedLogManager.readLog(index).entry().committedValue()),
+                                false
+                        );
+
+                        CommandResult commandResult = stateMachine.apply(command, state.currentTerm());
+                        if (leaderId == nodeId && replicatedLogManager.readLog(index).logId().term() == state.currentTerm()) {
+                            leaderResults.add(commandResult);
+                        }
+                    }
+                }
+
+                //send results to client
+                for (CommandResult leaderResult : leaderResults) {
+                    //fixme что в параметры кидать ? а точнее в параметр command, со вторым параметром понял - туда leaderResult кидать
+                    //externalGrpcActorInterface.onClientCommandResult();
+                }
+
+                //TODO update commit index - пока не понял как это сделать
+            }
+        }
+    }
+
+
+    private void onFailedAppendEntryResult(int srcId) {
+        nextIndex[srcId - 1] = nextIndex[srcId - 1] - 1;
+
+        if (leaderId != nodeId) {
+            return;
+        }
+
+        Entry entry = replicatedLogManager.readLog(nextIndex[srcId - 1]).entry();
+        Entry prevEntry = replicatedLogManager.readLog(nextIndex[srcId - 1] - 1).entry();
+
+        //TODO требуется помощь с шагом: Формируется и отправляется RPC-запрос AppendEntriesRequest для узла srcId с целью синхронизации его лога с лидером.
     }
 
     public synchronized void onRequestVote(Raft.VoteRequest voteRequest, Consumer<Raft.VoteResponse> onVoteResponse) {
