@@ -345,7 +345,8 @@ public class RaftActor implements RaftActorInterface {
                 }
 
                 Collection<CommandResult> leaderResults = new ArrayList<>();
-                if (nodesCount >= quorum(config.getCluster().size()) && replicatedLogManager.readLog(index).logId().term() == state.currentTerm()) {
+                if (nodesCount >= quorum(config.getCluster().size())
+                        && replicatedLogManager.readLog(index).logId().term() == state.currentTerm()) {
                     for (long i = replicatedLogManager.commitIndex() + 1; i < index; i++) {
                         Command command = new InsertCommand(
                                 /*fixme what a parameter must to be here (long processId) ???*/ 0L,
@@ -355,7 +356,8 @@ public class RaftActor implements RaftActorInterface {
                         );
 
                         CommandResult commandResult = stateMachine.apply(command, state.currentTerm());
-                        if (leaderId == nodeId && replicatedLogManager.readLog(index).logId().term() == state.currentTerm()) {
+                        if (leaderId == nodeId
+                                && replicatedLogManager.readLog(index).logId().term() == state.currentTerm()) {
                             leaderResults.add(commandResult);
                         }
                     }
@@ -363,7 +365,8 @@ public class RaftActor implements RaftActorInterface {
 
                 //send results to client
                 for (CommandResult leaderResult : leaderResults) {
-                    //fixme что в параметры кидать ? а точнее в параметр command, со вторым параметром понял - туда leaderResult кидать
+                    //fixme что в параметры кидать ? а точнее в параметр command,
+                    // со вторым параметром понял - туда leaderResult кидать
                     //externalGrpcActorInterface.onClientCommandResult();
                 }
 
@@ -383,7 +386,8 @@ public class RaftActor implements RaftActorInterface {
         Entry entry = replicatedLogManager.readLog(nextIndex[srcId - 1]).entry();
         Entry prevEntry = replicatedLogManager.readLog(nextIndex[srcId - 1] - 1).entry();
 
-        //TODO требуется помощь с шагом: Формируется и отправляется RPC-запрос AppendEntriesRequest для узла srcId с целью синхронизации его лога с лидером.
+        //TODO требуется помощь с шагом: Формируется и отправляется RPC-запрос
+        // AppendEntriesRequest для узла srcId// с целью синхронизации его лога с лидером.
     }
 
     public synchronized void onRequestVote(Raft.VoteRequest voteRequest, Consumer<Raft.VoteResponse> onVoteResponse) {
