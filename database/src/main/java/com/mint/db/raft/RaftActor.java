@@ -399,7 +399,7 @@ public class RaftActor implements RaftActorInterface {
 
         long prevLogIndex = Math.max(nextIndex[srcId - 1] - 1, 0);
         LogEntry prevLogEntry = replicatedLogManager.readLog(prevLogIndex);
-        Entry prevEntry = prevLogEntry.entry();
+        Entry<MemorySegment> prevEntry = prevLogEntry.entry();
         LogId prevLogId = prevEntry != null ? prevLogEntry.logId() : START_LOG_ID;
 
         //RPC-запрос AppendEntriesRequest для узла srcIdс с целью синхронизации его лога с лидером
