@@ -371,7 +371,7 @@ public class RaftActor implements RaftActorInterface {
                     CommandResult commandResult = stateMachine.apply(command, state.currentTerm());
                     if (leaderId == nodeId && logEntryMemorySegment.logId().term() == state.currentTerm()) {
                         leaderResults.add(new Pair<>(command, commandResult));
-                    } else if (leaderId == nodeId && logEntry.logId().term() == state.currentTerm()) {
+                    } else if (leaderId == nodeId && logEntryMemorySegment.logId().term() == state.currentTerm()) {
                         externalGrpcActorInterface.onClientCommandResult(command, commandResult);
                     }
                 }
