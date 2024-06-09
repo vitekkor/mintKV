@@ -352,12 +352,21 @@ public class RaftActor implements RaftActorInterface {
 
                 for (long i = replicatedLogManager.commitIndex() + 1; i <= index; i++) {
                     LogEntry<MemorySegment> logEntryMemorySegment = replicatedLogManager.readLog(index);
-                    Command command = new InsertCommand(
-                            logEntryMemorySegment.entry().processId(),
-                            StringDaoWrapper.toString(logEntryMemorySegment.entry().key()),
-                            StringDaoWrapper.toString(logEntryMemorySegment.entry().committedValue()),
-                            false
-                    );
+                    Command command;
+                    if (logEntryMemorySegment.operationType() == OperationType.GET) {
+                        command = new GetCommand(
+                                logEntryMemorySegment.entry().processId(),
+                                StringDaoWrapper.toString(logEntryMemorySegment.entry().key()),
+                                DatabaseServiceOuterClass.ReadMode.READ_COMMITTED
+                        );
+                    } else {
+                        command = new InsertCommand(
+                                logEntryMemorySegment.entry().processId(),
+                                StringDaoWrapper.toString(logEntryMemorySegment.entry().key()),
+                                StringDaoWrapper.toString(logEntryMemorySegment.entry().readUncommittedValue()),
+                                false
+                        );
+                    }
 
                     CommandResult commandResult = stateMachine.apply(command, state.currentTerm());
                     if (leaderId == nodeId && logEntryMemorySegment.logId().term() == state.currentTerm()) {
