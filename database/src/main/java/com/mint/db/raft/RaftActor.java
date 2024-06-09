@@ -398,7 +398,7 @@ public class RaftActor implements RaftActorInterface {
         LogEntry logEntry = replicatedLogManager.readLog(nextIndex[srcId - 1]);
 
         long prevLogIndex = Math.max(nextIndex[srcId - 1] - 1, 0);
-        LogEntry prevLogEntry = replicatedLogManager.readLog(prevLogIndex);
+        LogEntry<MemorySegment> prevLogEntry = replicatedLogManager.readLog(prevLogIndex);
         Entry<MemorySegment> prevEntry = prevLogEntry.entry();
         LogId prevLogId = prevEntry != null ? prevLogEntry.logId() : START_LOG_ID;
 
