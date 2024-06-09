@@ -13,6 +13,7 @@ import com.mint.db.raft.model.GetCommand;
 import com.mint.db.raft.model.InsertCommand;
 import com.mint.db.raft.model.InsertCommandResult;
 import com.mint.db.raft.model.LogId;
+import com.mint.db.raft.model.Pair;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
 import com.mint.db.replication.model.LogEntry;
@@ -60,6 +61,7 @@ public class RaftActor implements RaftActorInterface {
     private final long[] nextIndex;
     private long lastApplied;
     private final long[] matchIndex;
+    private static final LogId START_LOG_ID = new LogId(0, 0);
 
     private StateMachine<MemorySegment> stateMachine;
 
@@ -314,11 +316,10 @@ public class RaftActor implements RaftActorInterface {
 
         //become a follower
         if (appendEntriesResponse.getTerm() > currentState.currentTerm()) {
-            synchronized (replicatedLogManager) {
-                leaderId = -1;
-                replicatedLogManager.writePersistentState(new PersistentState(appendEntriesResponse.getTerm()));
-            }
+            leaderId = -1;
+            replicatedLogManager.writePersistentState(new PersistentState(appendEntriesResponse.getTerm()));
             startTimeout(Timeout.ELECTION_TIMEOUT);
+            return;
         }
 
         //handle result
@@ -331,46 +332,49 @@ public class RaftActor implements RaftActorInterface {
     }
 
     private void onSuccessfullAppendEntryResult(int srcId, long messageLastIndex, PersistentState state) {
-        //TODO update indexes - немного не понял как это сделать
+        //update indexes
+        nextIndex[srcId - 1] = messageLastIndex + 1;
+        matchIndex[srcId - 1] = messageLastIndex;
 
-        //check if current node is leader
-        if (leaderId == nodeId) {
-            //commit entries
-            for (long index = replicatedLogManager.commitIndex() + 1; index < messageLastIndex; index++) {
-                int nodesCount = 0;
-                for (long i : matchIndex) {
-                    if (i >= index) {
-                        nodesCount++;
-                    }
+        //commit entries
+        for (long index = replicatedLogManager.commitIndex() + 1; index <= messageLastIndex; index++) {
+            int nodesCount = 0;
+            for (long i : matchIndex) {
+                if (i >= index) {
+                    nodesCount++;
                 }
+            }
 
-                Collection<CommandResult> leaderResults = new ArrayList<>();
-                if (nodesCount >= quorum(config.getCluster().size())
-                        && replicatedLogManager.readLog(index).logId().term() == state.currentTerm()) {
-                    for (long i = replicatedLogManager.commitIndex() + 1; i < index; i++) {
-                        Command command = new InsertCommand(
-                                /*fixme what a parameter must to be here (long processId) ???*/ 0L,
-                                StringDaoWrapper.toString(replicatedLogManager.readLog(index).entry().key()),
-                                StringDaoWrapper.toString(replicatedLogManager.readLog(index).entry().committedValue()),
-                                false
-                        );
 
-                        CommandResult commandResult = stateMachine.apply(command, state.currentTerm());
-                        if (leaderId == nodeId
-                                && replicatedLogManager.readLog(index).logId().term() == state.currentTerm()) {
-                            leaderResults.add(commandResult);
-                        }
+            LogEntry logEntry = replicatedLogManager.readLog(index);
+            boolean isLogTermEqualToCurrentTerm = logEntry != null && logEntry.logId().term() == state.currentTerm();
+            if (nodesCount >= quorum(config.getCluster().size()) && isLogTermEqualToCurrentTerm) {
+                Collection<Pair<Command, CommandResult>> leaderResults = new ArrayList<>();
+
+                for (long i = replicatedLogManager.commitIndex() + 1; i <= index; i++) {
+                    LogEntry<MemorySegment> logEntryMemorySegment = replicatedLogManager.readLog(index);
+                    Command command = new InsertCommand(
+                            logEntryMemorySegment.entry().processId(),
+                            StringDaoWrapper.toString(logEntryMemorySegment.entry().key()),
+                            StringDaoWrapper.toString(logEntryMemorySegment.entry().committedValue()),
+                            false
+                    );
+
+                    CommandResult commandResult = stateMachine.apply(command, state.currentTerm());
+                    if (leaderId == nodeId && logEntryMemorySegment.logId().term() == state.currentTerm()) {
+                        leaderResults.add(new Pair<>(command, commandResult));
+                    } else if (leaderId == nodeId && logEntry.logId().term() == state.currentTerm()) {
+                        externalGrpcActorInterface.onClientCommandResult(command, commandResult);
                     }
                 }
 
                 //send results to client
-                for (CommandResult leaderResult : leaderResults) {
-                    //fixme что в параметры кидать ? а точнее в параметр command,
-                    // со вторым параметром понял - туда leaderResult кидать
-                    //externalGrpcActorInterface.onClientCommandResult();
+                for (Pair<Command, CommandResult> leaderResult : leaderResults) {
+                    externalGrpcActorInterface.onClientCommandResult(leaderResult.first(), leaderResult.second());
                 }
 
-                //TODO update commit index - пока не понял как это сделать
+                //update commit index
+                replicatedLogManager.setCommitIndex(index);
             }
         }
     }
@@ -383,11 +387,23 @@ public class RaftActor implements RaftActorInterface {
             return;
         }
 
-        Entry entry = replicatedLogManager.readLog(nextIndex[srcId - 1]).entry();
-        Entry prevEntry = replicatedLogManager.readLog(nextIndex[srcId - 1] - 1).entry();
+        LogEntry logEntry = replicatedLogManager.readLog(nextIndex[srcId - 1]);
 
-        //TODO требуется помощь с шагом: Формируется и отправляется RPC-запрос
-        // AppendEntriesRequest для узла srcId// с целью синхронизации его лога с лидером.
+        long prevLogIndex = Math.max(nextIndex[srcId - 1] - 1, 0);
+        LogEntry prevLogEntry = replicatedLogManager.readLog(prevLogIndex);
+        Entry prevEntry = prevLogEntry.entry();
+        LogId prevLogId = prevEntry != null ? prevLogEntry.logId() : START_LOG_ID;
+
+        //RPC-запрос AppendEntriesRequest для узла srcIdс с целью синхронизации его лога с лидером
+        Raft.AppendEntriesRequest appendEntriesRequest = Raft.AppendEntriesRequest.newBuilder()
+                .setTerm(replicatedLogManager.readPersistentState().currentTerm())
+                .setPrevLogIndex(prevLogId.index())
+                .setPrevLogTerm(prevLogId.term())
+                .setLeaderCommit(replicatedLogManager.commitIndex())
+                .setLeaderId(nodeId)
+                .addEntries(EntryConverter.logEntryToRaftLogEntry(logEntry))
+                .build();
+        internalGrpcActor.sendAppendEntriesRequest(srcId, appendEntriesRequest, this::onAppendEntryResult);
     }
 
     public synchronized void onRequestVote(Raft.VoteRequest voteRequest, Consumer<Raft.VoteResponse> onVoteResponse) {
