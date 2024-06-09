@@ -91,11 +91,11 @@ class RaftActorTest {
                     new ReplicatedLogManagerImpl(nodeConfig, new PersistentState(), new BaseDao());
 
             StateMachine<MemorySegment> stateMachine = Mockito.mock(DaoStateMachine.class);
-            Environment<MemorySegment> environment = new EnvironmentImpl(nodeConfig, replicatedLogManager, stateMachine);
+            Environment<MemorySegment> env = new EnvironmentImpl(nodeConfig, replicatedLogManager, stateMachine);
 
             RaftActor raftActor = new RaftActor(
                     internalGrpcActor,
-                    environment,
+                    env,
                     externalGrpcActor
             );
             cluster.add(raftActor);

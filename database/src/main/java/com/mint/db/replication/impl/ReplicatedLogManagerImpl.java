@@ -228,7 +228,9 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     @Override
     public List<LogEntry<MemorySegment>> readLog(long fromIndex, long toIndex) {
         updateIndexMemorySegment();
-        if (fromIndex < 0) return Collections.emptyList();
+        if (fromIndex < 0) {
+            return Collections.emptyList();
+        }
         long offset = indexOutputMemorySegment.get(
                 ValueLayout.OfByte.JAVA_LONG_UNALIGNED,
                 fromIndex * Long.BYTES

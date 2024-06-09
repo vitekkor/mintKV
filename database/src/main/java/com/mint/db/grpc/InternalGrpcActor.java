@@ -120,10 +120,13 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
                 .build();
         client.get(commandRequestRPC, response -> {
             logger.debug("Get command result received for key: {}", command.key());
+            String value = response.getValue() != com.google.protobuf.ByteString.EMPTY
+                    ? response.getValue().toStringUtf8()
+                    : null;
             GetCommandResult result = new GetCommandResult(
                     response.getTerm(),
                     command.key(),
-                    response.getValue() != com.google.protobuf.ByteString.EMPTY ? response.getValue().toStringUtf8() : null
+                    value
             );
             onCommandResult.accept(destId, command, result);
         });
@@ -180,10 +183,13 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
             logger.warn("No response observer found for command: {}", command);
             return;
         }
+        ByteString value = commandResult.value() != null
+                ? ByteString.copyFromUtf8(commandResult.value())
+                : ByteString.EMPTY;
         Raft.ClientCommandResponseRPC response = Raft.ClientCommandResponseRPC.newBuilder()
                 .setTerm(commandResult.term())
                 .setKey(ByteString.copyFromUtf8(commandResult.key()))
-                .setValue(commandResult.value() != null ? ByteString.copyFromUtf8(commandResult.value()) : ByteString.EMPTY)
+                .setValue(value)
                 .build();
         ((StreamObserver<Raft.ClientCommandResponseRPC>) responseObserver).onNext(response);
         responseObserver.onCompleted();

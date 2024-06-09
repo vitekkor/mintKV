@@ -11,7 +11,7 @@ public interface Environment<D> {
     /**
      * The total number of processes in the system.
      */
-    default int nProcesses() {
+    default int numberOfProcesses() {
         return config().getCluster().size();
     }
 

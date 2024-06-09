@@ -1,7 +1,6 @@
 package com.mint.db.raft;
 
 import com.mint.db.Raft;
-import com.mint.db.config.interceptors.MDCLogInterceptor;
 import com.mint.db.dao.Entry;
 import com.mint.db.dao.impl.BaseEntry;
 import com.mint.db.dao.impl.StringDaoWrapper;
@@ -73,11 +72,11 @@ public class RaftActor implements RaftActorInterface {
 
         this.nodeId = env.nodeId();
         this.lastApplied = env.replicatedLogManager().readLastLogId().index();
-        this.nextIndex = new long[env.nProcesses()];
-        for (int i = 0; i < env.nProcesses(); i++) {
+        this.nextIndex = new long[env.numberOfProcesses()];
+        for (int i = 0; i < env.numberOfProcesses(); i++) {
             nextIndex[i] = env.replicatedLogManager().readLastLogId().index() + 1;
         }
-        this.matchIndex = new long[env.nProcesses()];
+        this.matchIndex = new long[env.numberOfProcesses()];
 
         startTimeout(Timeout.ELECTION_TIMEOUT);
     }
@@ -102,7 +101,7 @@ public class RaftActor implements RaftActorInterface {
 
     public void startTimeout(Timeout timeout) {
         long heartbeatTimeoutMs = env.config().getHeartbeatTimeoutMs();
-        int numberOfProcesses = Math.max(env.nProcesses(), 2);
+        int numberOfProcesses = Math.max(env.numberOfProcesses(), 2);
         this.nextTimeout = heartbeatTimeoutMs + switch (timeout) {
             case ELECTION_TIMEOUT -> env.config().heartbeatRandom()
                     ? rand.nextLong(heartbeatTimeoutMs / numberOfProcesses, heartbeatTimeoutMs)
@@ -130,7 +129,7 @@ public class RaftActor implements RaftActorInterface {
             logger.debug("Send heartbeats");
 
             PersistentState state = env.replicatedLogManager().readPersistentState();
-            for (int i = 0; i < env.nProcesses(); i++) {
+            for (int i = 0; i < env.numberOfProcesses(); i++) {
                 if (i != nodeId) {
                     // if follower lagging behind from our log
                     // then we send nextIndex entry to him
@@ -322,7 +321,11 @@ public class RaftActor implements RaftActorInterface {
     
     @Override
     public void onAppendEntryResult(int srcId, Raft.AppendEntriesResponse appendEntriesResponse) {
-        logger.debug("Received appendEntriesResponse from {}: {}", srcId, LogUtil.protobufMessageToString(appendEntriesResponse));
+        logger.debug(
+                "Received appendEntriesResponse from {}: {}",
+                srcId,
+                LogUtil.protobufMessageToString(appendEntriesResponse)
+        );
         PersistentState currentState = env.replicatedLogManager().readPersistentState();
 
         // ignore obsolete messages
@@ -366,7 +369,7 @@ public class RaftActor implements RaftActorInterface {
 
             LogEntry<MemorySegment> logEntry = env.replicatedLogManager().readLog(index);
             boolean isLogTermEqualToCurrentTerm = logEntry != null && logEntry.logId().term() == state.currentTerm();
-            if (nodesCount >= quorum(env.nProcesses()) && isLogTermEqualToCurrentTerm) {
+            if (nodesCount >= quorum(env.numberOfProcesses()) && isLogTermEqualToCurrentTerm) {
                 long commitIndex = env.replicatedLogManager().commitIndex();
                 logger.debug("Commit entries from {} to {}", commitIndex + 1, index);
                 Collection<Pair<Command, CommandResult>> leaderResults = new ArrayList<>();
@@ -517,7 +520,7 @@ public class RaftActor implements RaftActorInterface {
         }
         if (voteResponse.getVoteGranted()) {
             votedForMe++;
-            if (votedForMe == quorum(env.nProcesses())) {
+            if (votedForMe == quorum(env.numberOfProcesses())) {
                 leaderId = nodeId;
                 votedForMe = 0;
                 onTimeout();
@@ -597,8 +600,13 @@ public class RaftActor implements RaftActorInterface {
                         StringDaoWrapper.toMemorySegment(command.value()),
                         false
                 );
-                LogEntry<MemorySegment> logEntry =
-                        createLogEntryFromEntry(OperationType.GET, entry, lastLogId, state.currentTerm(), command.processId());
+                LogEntry<MemorySegment> logEntry = createLogEntryFromEntry(
+                        OperationType.GET,
+                        entry,
+                        lastLogId,
+                        state.currentTerm(),
+                        command.processId()
+                );
 
                 if (isClusterReadyToAcceptEntries(logEntry)) {
                     sendAppendEntriesRequest(state, logEntry, lastLogId);
@@ -640,11 +648,11 @@ public class RaftActor implements RaftActorInterface {
     }
 
     private boolean isClusterReadyToAcceptEntries(LogEntry<MemorySegment> logEntry) {
-        int count = (int) IntStream.range(0, env.nProcesses())
+        int count = (int) IntStream.range(0, env.numberOfProcesses())
                 .filter(i -> i != nodeId && nextIndex[i] == logEntry.logId().index())
                 .count();
 
-        return count >= quorum(env.nProcesses());
+        return count >= quorum(env.numberOfProcesses());
     }
 
     private void sendAppendEntriesRequest(PersistentState state, LogEntry<MemorySegment> logEntry, LogId lastLogId) {

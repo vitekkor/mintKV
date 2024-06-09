@@ -44,7 +44,7 @@ fun Random.nextLogEntry(index: Long, term: Long, env: Environment<*>) =
             false
         ),
         LogId(index, term),
-        nextInt(0 until env.nProcesses())
+        nextInt(0 until env.numberOfProcesses())
     )
 
 fun Command.toLogEntry(logId: LogId): LogEntry<MemorySegment> {
