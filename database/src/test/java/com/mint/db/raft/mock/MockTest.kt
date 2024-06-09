@@ -7,15 +7,15 @@ import com.mint.db.Raft.AppendEntriesRequest
 import com.mint.db.Raft.VoteRequest
 import com.mint.db.config.NodeConfig
 import com.mint.db.dao.impl.BaseDao
+import com.mint.db.dao.impl.StringDaoWrapper
 import com.mint.db.grpc.ExternalGrpcActorInterface
-import com.mint.db.grpc.InternalGrpcActor
 import com.mint.db.raft.DaoStateMachine
 import com.mint.db.raft.Environment
-import com.mint.db.raft.RaftActor
+import com.mint.db.raft.RaftActorInterface
 import com.mint.db.raft.StateMachine
 import com.mint.db.raft.Timeout
 import com.mint.db.raft.mock.ProcessAction.AppendLogEntry
-import com.mint.db.raft.mock.ProcessAction.ApplyCommandLogEntry
+import com.mint.db.raft.mock.ProcessAction.ApplyCommand
 import com.mint.db.raft.mock.ProcessAction.Result
 import com.mint.db.raft.mock.ProcessAction.Send
 import com.mint.db.raft.mock.ProcessAction.StartTimeout
@@ -28,26 +28,58 @@ import com.mint.db.replication.ReplicatedLogManager
 import com.mint.db.replication.model.LogEntry
 import com.mint.db.replication.model.PersistentState
 import com.mint.db.util.EntryConverter
+import com.mint.db.util.LogUtil
 import org.junit.After
+import org.junit.Assert
 import org.junit.Before
-import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.Test
+import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import org.mockito.Mockito
 import java.lang.foreign.MemorySegment
+import java.nio.file.Files
 import kotlin.random.Random
 import kotlin.random.nextInt
 import kotlin.random.nextLong
 
 sealed class ProcessAction {
-    data class Send(val destId: Int, val message: Message) : ProcessAction()
+    data class Send(val destId: Int, val message: Message) : ProcessAction() {
+        override fun toString(): String {
+            return "Send(destId=$destId, message=${LogUtil.protobufMessageToString(message)})"
+        }
+    }
+
     data class Result(val result: CommandResult) : ProcessAction()
-    data class AppendLogEntry(val entry: LogEntry<MemorySegment>) : ProcessAction()
+    data class AppendLogEntry(val entry: LogEntry<MemorySegment>) : ProcessAction() {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is AppendLogEntry) return false
+
+            return entry.equals0(other.entry)
+        }
+
+        override fun hashCode(): Int {
+            return entry.hashCode()
+        }
+    }
+
     data class ApplyCommand(val command: Command, val currentTerm: Long) : ProcessAction()
-    data class ApplyCommandLogEntry(val entry: LogEntry<MemorySegment>, val committed: Boolean) : ProcessAction()
+
     data class WritePersistentState(val state: PersistentState) : ProcessAction()
     data class StartTimeout(val timeout: Timeout) : ProcessAction()
+
+    companion object {
+        private fun LogEntry<MemorySegment>.equals0(other: LogEntry<MemorySegment>): Boolean {
+            if (logId() != other.logId()) return false
+            if (operationType() != other.operationType()) return false
+            val stringEntry = StringDaoWrapper.toBaseEntryString(entry())
+            val otherStringEntry = StringDaoWrapper.toBaseEntryString(other.entry())
+            if (stringEntry.key != otherStringEntry.key) return false
+            if (stringEntry.uncommittedValueIsNotNull != stringEntry.uncommittedValueIsNotNull) return false
+            if (stringEntry.readUncommittedValue() != stringEntry.readUncommittedValue()) return false
+            return true
+        }
+    }
 }
 
 interface ActionSink {
@@ -56,21 +88,21 @@ interface ActionSink {
 }
 
 @RunWith(Parameterized::class)
-class MockTestKt(
+class MockTest(
     private val raftActorId: Int,
     private val nraftActores: Int,
-    startTerm: Long,
-    lastLogIndex: Long,
+    startTerm: Int,
+    lastLogIndex: Int,
 ) : ActionSink, Environment<MemorySegment> {
     companion object {
         @JvmStatic
         @Parameterized.Parameters(name = "pid{0}/{1} term={2} log={3}")
         fun parameters() =
             listOf(
-                arrayOf(1, 3, 0L, 0L),
-                arrayOf(2, 3, 5L, 2L),
-                arrayOf(3, 5, 7L, 9L),
-                arrayOf(4, 7, 11L, 15L)
+                arrayOf(0, 3, 0, 0),
+                arrayOf(1, 3, 5, 2),
+                arrayOf(2, 5, 7, 9),
+                arrayOf(3, 7, 11, 15)
             )
 
         private val START_LOG_ID = LogId(0, 0)
@@ -86,24 +118,34 @@ class MockTestKt(
     private val machine = MockDaoStateMachine(this, dao)
     override fun stateMachine(): StateMachine<MemorySegment> = machine
 
-    private var internalGrpcActor = InternalGrpcActorMock(this, nraftActores)
+    private var internalGrpcActor = InternalGrpcActorMock(this, nraftActores, raftActorId)
+
+    private val tmpLogDir = Files.createTempDirectory("mintKV").toFile().apply {
+        deleteOnExit()
+    }.path
 
     private val nodeConfig: NodeConfig = Mockito.mock(NodeConfig::class.java).apply {
         Mockito.`when`(this.nodeId).thenReturn(raftActorId)
         Mockito.`when`(this.cluster).thenReturn(List(nraftActores) { "http://localhost:808$it" })
+        Mockito.`when`(this.logDir).thenReturn(tmpLogDir)
     }
 
     override fun config(): NodeConfig = nodeConfig
 
-    private var persistentState = PersistentState(startTerm)
+    private var persistentState = PersistentState(startTerm.toLong())
     private val replicatedLogManager =
-        MockReplicatedLogManager(this, nodeConfig, persistentState, dao, lastLogIndex, rnd)
+        MockReplicatedLogManager(this, this, nodeConfig, persistentState, dao, lastLogIndex.toLong(), rnd)
 
     override fun replicatedLogManager(): ReplicatedLogManager<MemorySegment> = replicatedLogManager
     private val term: Long get() = replicatedLogManager.readPersistentState().currentTerm
     private val lastLogId: LogId get() = replicatedLogManager.readLastLogId()
 
-    private var externalGrpcActorInterface = Mockito.mock(ExternalGrpcActorInterface::class.java)
+    private var externalGrpcActorInterface = Mockito.mock(ExternalGrpcActorInterface::class.java).apply {
+        Mockito.`when`(this.onClientCommandResult(Mockito.any(), Mockito.any())).thenAnswer {
+            actions += Result(it.getArgument(1))
+            null
+        }
+    }
 
     override operator fun plusAssign(action: ProcessAction) {
         actions += action
@@ -117,20 +159,7 @@ class MockTestKt(
         actions += Send(destId, message)
     }
 
-    fun startTimeout(timeout: Timeout) {
-        removeActionIf { it is StartTimeout }
-        actions += StartTimeout(timeout)
-    }
-
-    fun onClientCommandResult(result: CommandResult) {
-        actions += Result(result)
-    }
-
-    private val raftActor by lazy {
-        Mockito.spy(RaftActor(internalGrpcActor, this, externalGrpcActorInterface)).apply {
-            Mockito.`when`(this.startTimeout(Mockito.any())).thenAnswer { }
-        }
-    }
+    private val raftActor = RaftActorForMockTest(this, internalGrpcActor, this, externalGrpcActorInterface)
 
     @Before
     fun initFollower() {
@@ -145,10 +174,7 @@ class MockTestKt(
     @Test
     fun `FOLLOWER responds on ping in the current term`() {
         val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
-        raftActor.onAppendEntry(AppendEntryRpc(leaderId, term, lastLogId, 0, null)) {
-            Assertions.assertEquals(term, it.term)
-            Assertions.assertEquals(lastLogId.index, it.lastIndex)
-        }
+        raftActor.onAppendEntry(AppendEntryRpc(leaderId, term, lastLogId, 0, null))
         expectActions(
             Send(leaderId, AppendEntryResult(term, lastLogId.index)),
             StartTimeout(Timeout.ELECTION_TIMEOUT)
@@ -157,7 +183,7 @@ class MockTestKt(
 
     @Test
     fun `FOLLOWER responds on ping in the new term`() {
-        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val newTerm = term + rnd.nextInt(1..3)
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, newTerm, lastLogId, 0, null))
         expectActions(
@@ -179,7 +205,7 @@ class MockTestKt(
             StartTimeout(Timeout.ELECTION_TIMEOUT)
         )
         // Votes again for the same candidate
-        raftActor.onRequestVote(RequestVoteRpc(leaderId, newTerm, lastLogId)) {}
+        raftActor.onRequestVote(RequestVoteRpc(leaderId, newTerm, lastLogId))
         expectActions(
             Send(leaderId, RequestVoteResult(newTerm, true)),
         )
@@ -189,7 +215,7 @@ class MockTestKt(
     fun `FOLLOWER votes for a candidate with more up-to-date log (new term, old index)`() {
         if (term <= 1 || lastLogId.index == 0L) return
         val oldIndex = findOldLogId().index
-        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val newTerm = term + rnd.nextInt(1..3)
         val oldLogId = LogId(oldIndex, newTerm)
         raftActor.onRequestVote(RequestVoteRpc(candidateId, newTerm, oldLogId))
@@ -202,8 +228,8 @@ class MockTestKt(
 
     @Test
     fun `FOLLOWER refuses to vote for a different candidate`() {
-        val candidateId1 = raftActorId % nraftActores + 1
-        val candidateId2 = candidateId1 % nraftActores + 1
+        val candidateId1 = raftActorId % nraftActores
+        val candidateId2 = (candidateId1 + 1) % nraftActores
         val newTerm = term + rnd.nextInt(1..3)
         // Updates term and grants vote to leaderId1
         raftActor.onRequestVote(RequestVoteRpc(candidateId1, newTerm, lastLogId))
@@ -222,7 +248,7 @@ class MockTestKt(
     @Test
     fun `FOLLOWER refuses to vote for a candidate with not up-to-date log (old index)`() {
         if (lastLogId.index <= 0) return
-        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val newTerm = term + rnd.nextInt(1..3)
         val oldLogId = replicatedLogManager.readLog(rnd.nextLong(0L until lastLogId.index))?.logId()
             ?: START_LOG_ID
@@ -237,7 +263,7 @@ class MockTestKt(
     @Test
     fun `FOLLOWER refuses to vote for a candidate with not up-to-date log (old term)`() {
         if (lastLogId.term <= 1) return
-        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val newTerm = term + rnd.nextInt(1..3)
         val oldLogId = LogId(lastLogId.index, lastLogId.term - 1)
         raftActor.onRequestVote(RequestVoteRpc(candidateId, newTerm, oldLogId))
@@ -251,7 +277,7 @@ class MockTestKt(
     @Test
     fun `FOLLOWER refuses to vote for a candidate with not up-to-date log (new index, old term)`() {
         if (lastLogId.term <= 1) return
-        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val newTerm = term + rnd.nextInt(1..3)
         val newIndex = lastLogId.index + rnd.nextInt(1..3)
         val oldLogId = LogId(newIndex, lastLogId.term - 1)
@@ -266,7 +292,7 @@ class MockTestKt(
     @Test
     fun `FOLLOWER refuses to vote for a stale candidate`() {
         if (term == 0L) return
-        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val oldTerm = rnd.nextLong(0L until term)
         raftActor.onRequestVote(RequestVoteRpc(candidateId, oldTerm, lastLogId))
         expectActions(
@@ -276,10 +302,10 @@ class MockTestKt(
 
     @Test
     fun `FOLLOWER appends matching log entries`() {
-        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val newTerm = term + rnd.nextInt(1..3)
         // Append one entry
-        val entry1 = rnd.nextLogEntry(lastLogId.index + 1, newTerm)
+        val entry1 = rnd.nextLogEntry(lastLogId.index + 1, newTerm, this)
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, newTerm, lastLogId, 0, entry1))
         expectActions(
             Send(leaderId, AppendEntryResult(newTerm, entry1.logId.index)),
@@ -288,7 +314,7 @@ class MockTestKt(
             StartTimeout(Timeout.ELECTION_TIMEOUT)
         )
         // Append another entry from the same term
-        val entry2 = rnd.nextLogEntry(lastLogId.index + 1, newTerm)
+        val entry2 = rnd.nextLogEntry(lastLogId.index + 1, newTerm, this)
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, newTerm, entry1.logId, 0, entry2))
         expectActions(
             Send(leaderId, AppendEntryResult(newTerm, entry2.logId.index)),
@@ -299,9 +325,9 @@ class MockTestKt(
 
     @Test
     fun `FOLLOWER rejects unmatched log entry`() {
-        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val newTerm = term + rnd.nextInt(1..3)
-        val entry = rnd.nextLogEntry(lastLogId.index + 1, newTerm)
+        val entry = rnd.nextLogEntry(lastLogId.index + 1, newTerm, this)
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, newTerm, entry.logId, 0, entry))
         expectActions(
             Send(leaderId, AppendEntryResult(newTerm, null)),
@@ -316,7 +342,7 @@ class MockTestKt(
         val lastLogIndex = lastLogId.index
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, term, lastLogId, lastLogIndex, null))
         expectActions(
-            (1L..lastLogIndex).map { ApplyCommandLogEntry(replicatedLogManager.readLog(it)!!, true) },
+            (1L..lastLogIndex).map { ApplyCommand(replicatedLogManager.readLog(it)!!.command, term) },
             Send(leaderId, AppendEntryResult(term, lastLogIndex)),
             StartTimeout(Timeout.ELECTION_TIMEOUT)
         )
@@ -324,12 +350,12 @@ class MockTestKt(
 
     @Test
     fun `FOLLOWER commits some log entries on leader commit`() {
-        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val lastLogIndex = lastLogId.index
         val leaderCommit = rnd.nextLong(0L..lastLogIndex)
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, term, lastLogId, leaderCommit, null))
         expectActions(
-            (1..leaderCommit).map { ApplyCommandLogEntry(replicatedLogManager.readLog(it)!!, true) },
+            (1..leaderCommit).map { ApplyCommand(replicatedLogManager.readLog(it)!!.command, term) },
             Send(leaderId, AppendEntryResult(term, lastLogIndex)),
             StartTimeout(Timeout.ELECTION_TIMEOUT)
         )
@@ -338,7 +364,7 @@ class MockTestKt(
     @Test
     fun `FOLLOWER rejects commit message from stale leader`() {
         if (term == 0L) return
-        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val oldTerm = rnd.nextLong(0L until term)
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, oldTerm, lastLogId, lastLogId.index, null))
         expectActions(
@@ -350,7 +376,7 @@ class MockTestKt(
     fun `FOLLOWER queues direct client command and forwards it to leader on ping`() {
         val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
         // the first command
-        val command1 = rnd.nextCommand(raftActorId.toLong())
+        val command1 = rnd.nextCommand(raftActorId)
         raftActor.onClientCommand(command1)
         expectActions() // nothing
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, term, lastLogId, 0, null))
@@ -360,7 +386,7 @@ class MockTestKt(
             StartTimeout(Timeout.ELECTION_TIMEOUT)
         )
         // one more command
-        val command2 = rnd.nextCommand(raftActorId.toLong())
+        val command2 = rnd.nextCommand(raftActorId)
         raftActor.onClientCommand(command2)
         expectActions(
             Send(leaderId, ClientCommandRpc(raftActorId, command2))
@@ -371,31 +397,31 @@ class MockTestKt(
     fun `FOLLOWER queues forwarded client commands and forwards it to leader on ping`() {
         if (term <= 1) return
         val oldTerm = rnd.nextInt(1..<term.toInt())
-        val clientId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
-        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val clientId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
+        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         // the first command
-        val command1 = rnd.nextCommand(clientId.toLong())
+        val command1 = rnd.nextCommand(clientId)
         raftActor.onClientCommand(command1)
         expectActions() // nothing
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, term, lastLogId, 0, null))
         expectActions(
             Send(leaderId, AppendEntryResult(term, lastLogId.index)),
-            Send(leaderId, ClientCommandRpc(raftActorId, command1)),
+            Send(leaderId, ClientCommandRpc(clientId, command1)),
             StartTimeout(Timeout.ELECTION_TIMEOUT)
         )
         // one more stable command from old term
         val command2 = rnd.nextCommand(clientId)
         raftActor.onClientCommand(command2)
         expectActions(
-            Send(leaderId, ClientCommandRpc(raftActorId, command2))
+            Send(leaderId, ClientCommandRpc(clientId, command2))
         )
     }
 
     @Test
     fun `FOLLOWER reports command result`() {
-        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val result = rnd.nextCommandResult(term)
-        raftActor.onClientCommandResult(null, result)
+        raftActor.onClientCommandResult(leaderId, null, result)
         expectActions(
             Result(result)
         )
@@ -407,10 +433,10 @@ class MockTestKt(
         val myCommand = rnd.nextCommand(raftActorId)
         raftActor.onClientCommand(myCommand)
         // message from some new leader
-        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val newTerm = term + rnd.nextInt(1..3)
         val result = rnd.nextCommandResult(newTerm)
-        raftActor.onClientCommandResult(null, result)
+        raftActor.onClientCommandResult(leaderId, myCommand, result)
         expectActions(
             Result(result),
             WritePersistentState(PersistentState(newTerm)),
@@ -427,7 +453,7 @@ class MockTestKt(
         val oldIndex = oldLogId.index
         val oldLeaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
         val prevLogId = replicatedLogManager.readLog(oldIndex - 1)?.logId() ?: START_LOG_ID
-        val oldEntry = rnd.nextLogEntry(oldIndex, oldTerm)
+        val oldEntry = rnd.nextLogEntry(oldIndex, oldTerm, this)
         raftActor.onAppendEntry(AppendEntryRpc(oldLeaderId, oldTerm, prevLogId, oldIndex, oldEntry))
         expectActions(
             Send(oldLeaderId, AppendEntryResult(term, null))
@@ -438,7 +464,7 @@ class MockTestKt(
     fun `FOLLOWER ignores AppendEntryResult from an old term`() {
         if (term <= 1) return
         val oldTerm = rnd.nextLong(1 until term)
-        val followerId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val followerId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         raftActor.onAppendEntryResult(followerId, AppendEntryResult(oldTerm, null))
         expectActions()
         raftActor.onAppendEntryResult(followerId, AppendEntryResult(oldTerm, 1))
@@ -450,7 +476,7 @@ class MockTestKt(
         if (term <= 1 || lastLogId.index == 0L) return
         val oldLogId = findOldLogId()
         val oldTerm = oldLogId.term
-        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         raftActor.onRequestVoteResult(candidateId, RequestVoteResult(oldTerm, true))
         expectActions()
     }
@@ -463,7 +489,7 @@ class MockTestKt(
 
     private fun expectCandidateVoteRequest(term: Long) {
         expectActions(
-            (1..nraftActores).filter { it != raftActorId }.map {
+            (0 until nraftActores).filter { it != raftActorId }.map {
                 Send(it, RequestVoteRpc(raftActorId, term, lastLogId))
             },
             WritePersistentState(PersistentState(term, raftActorId)),
@@ -480,7 +506,7 @@ class MockTestKt(
     @Test
     fun `CANDIDATE does not become a leader without enough votes`() {
         initCandidate()
-        val otherIds = (1..nraftActores).filter { it != raftActorId }
+        val otherIds = (0 until nraftActores).filter { it != raftActorId }
         val grantedVote = otherIds.shuffled(rnd).take(nraftActores / 2 - 1).toSet()
         for (id in otherIds.shuffled(rnd)) {
             raftActor.onRequestVoteResult(id, RequestVoteResult(term, id in grantedVote))
@@ -545,7 +571,7 @@ class MockTestKt(
         val oldLeaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
         initCandidate()
         val result = rnd.nextCommandResult(oldTerm)
-        raftActor.onClientCommandResult(null, result)
+        raftActor.onClientCommandResult(oldLeaderId, null, result)
         expectActions(
             Result(result)
         )
@@ -559,7 +585,7 @@ class MockTestKt(
         val oldIndex = oldLogId.index
         val oldLeaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
         val prevLogId = replicatedLogManager.readLog(oldIndex - 1)?.logId() ?: START_LOG_ID
-        val oldEntry = rnd.nextLogEntry(oldIndex, oldTerm)
+        val oldEntry = rnd.nextLogEntry(oldIndex, oldTerm, this)
         initCandidate()
         raftActor.onAppendEntry(AppendEntryRpc(oldLeaderId, oldTerm, prevLogId, oldIndex, oldEntry))
         expectActions(
@@ -571,7 +597,7 @@ class MockTestKt(
     fun `CANDIDATE ignores AppendEntryResult from an old term`() {
         if (term <= 1) return
         val oldTerm = rnd.nextLong(1L until term)
-        val followerId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val followerId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         initCandidate()
         raftActor.onAppendEntryResult(followerId, AppendEntryResult(oldTerm, null))
         expectActions()
@@ -586,7 +612,7 @@ class MockTestKt(
 
     private fun initLeader() {
         initCandidate()
-        val ids = (1..nraftActores).filter { it != raftActorId }.shuffled(rnd).take(nraftActores / 2)
+        val ids = (0 until nraftActores).filter { it != raftActorId }.shuffled(rnd).take(nraftActores / 2)
         for (id in ids) {
             expectActions() // while not last
             raftActor.onRequestVoteResult(id, RequestVoteResult(term, true))
@@ -597,7 +623,7 @@ class MockTestKt(
 
     private fun expectHeartbeats() {
         expectActions(
-            (1..nraftActores).filter { it != raftActorId }.map {
+            (0 until nraftActores).filter { it != raftActorId }.map {
                 Send(it, AppendEntryRpc(raftActorId, term, lastLogId, 0, null))
             },
             StartTimeout(Timeout.LEADER_HEARTBEAT_PERIOD)
@@ -614,7 +640,7 @@ class MockTestKt(
     @Test
     fun `LEADER receivers ping and becomes follower`() {
         initLeader()
-        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val newTerm = term + rnd.nextInt(1..3)
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, newTerm, lastLogId, 0, null))
         expectActions(
@@ -627,10 +653,10 @@ class MockTestKt(
     @Test
     fun `LEADER receivers entry and becomes follower`() {
         initLeader()
-        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val newTerm = term + rnd.nextInt(1..3)
         // Append one entry
-        val entry1 = rnd.nextLogEntry(lastLogId.index + 1, newTerm)
+        val entry1 = rnd.nextLogEntry(lastLogId.index + 1, newTerm, this)
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, newTerm, lastLogId, 0, entry1))
         expectActions(
             Send(leaderId, AppendEntryResult(newTerm, entry1.logId.index)),
@@ -639,7 +665,7 @@ class MockTestKt(
             StartTimeout(Timeout.ELECTION_TIMEOUT)
         )
         // Append another entry from the same term
-        val entry2 = rnd.nextLogEntry(lastLogId.index + 1, newTerm)
+        val entry2 = rnd.nextLogEntry(lastLogId.index + 1, newTerm, this)
         raftActor.onAppendEntry(AppendEntryRpc(leaderId, newTerm, entry1.logId, 0, entry2))
         expectActions(
             Send(leaderId, AppendEntryResult(newTerm, entry2.logId.index)),
@@ -657,7 +683,7 @@ class MockTestKt(
         val entry1 = command1.toLogEntry(LogId(lastLogId1.index + 1, term))
         raftActor.onClientCommand(command1)
         expectActions(
-            (1..nraftActores).filter { it != raftActorId }.map {
+            (0 until nraftActores).filter { it != raftActorId }.map {
                 Send(it, AppendEntryRpc(raftActorId, term, lastLogId1, 0, entry1))
             },
             AppendLogEntry(entry1)
@@ -678,20 +704,20 @@ class MockTestKt(
     fun `LEADER applies forwarded client commands`() {
         initLeader()
         // the first command
-        val clientId1 = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val clientId1 = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val command1 = rnd.nextCommand(clientId1)
         val lastLogId1 = lastLogId
         val entry1 = command1.toLogEntry(LogId(lastLogId1.index + 1, term))
         raftActor.onClientCommand(command1)
         expectActions(
-            (1..nraftActores).filter { it != raftActorId }.map {
+            (0 until nraftActores).filter { it != raftActorId }.map {
                 Send(it, AppendEntryRpc(raftActorId, term, lastLogId1, 0, entry1))
             },
             AppendLogEntry(entry1)
         )
         // subsequent command will not generate AppendEntryRpc (until they've responded to)
         repeat(2) {
-            val clientId2 = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+            val clientId2 = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
             val command2 = rnd.nextCommand(clientId2)
             val lastLogId2 = lastLogId
             val entry2 = command2.toLogEntry(LogId(lastLogId2.index + 1, term))
@@ -705,7 +731,7 @@ class MockTestKt(
     @Test
     fun `LEADER scans back log for on mismatched follower`() {
         initLeader()
-        val followerId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val followerId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         var lasIndex = lastLogId.index
         repeat(3) {
             if (lasIndex == 0L) return
@@ -728,7 +754,7 @@ class MockTestKt(
     private fun initLeaderWithNextIndices() {
         initLeader()
         // Ok response on leader's pings from all raftActores
-        for (id in 1..nraftActores) if (id != raftActorId) {
+        for (id in 0 until nraftActores) if (id != raftActorId) {
             raftActor.onAppendEntryResult(id, AppendEntryResult(term, lastLogId.index))
             expectActions()
         }
@@ -747,13 +773,13 @@ class MockTestKt(
             val entry = command.toLogEntry(LogId(lastLogId.index + 1, term))
             raftActor.onClientCommand(command)
             expectActions(
-                (1..nraftActores).filter { it != raftActorId }.map {
+                (0 until nraftActores).filter { it != raftActorId }.map {
                     Send(it, AppendEntryRpc(raftActorId, term, lastLogId, leaderCommit, entry))
                 },
                 AppendLogEntry(entry)
             )
             // responses in random order
-            val ids = (1..nraftActores).filter { it != raftActorId }.shuffled(rnd)
+            val ids = (0 until nraftActores).filter { it != raftActorId }.shuffled(rnd)
             var count = 0
             for (id in ids) {
                 raftActor.onAppendEntryResult(id, AppendEntryResult(term, entry.logId().index))
@@ -761,7 +787,7 @@ class MockTestKt(
                     val result = expectedMachine.apply(command, term) // FIXME
                     expectActions(
                         (leaderCommit + 1..entry.logId().index).map {
-                            ApplyCommandLogEntry(replicatedLogManager.readLog(it)!!, true)
+                            ApplyCommand(replicatedLogManager.readLog(it)!!.command, term)
                         },
                         Result(result)
                     )
@@ -787,13 +813,13 @@ class MockTestKt(
             val entry = command.toLogEntry(LogId(lastLogId.index + 1, term))
             raftActor.onClientCommand(command)
             expectActions(
-                (1..nraftActores).filter { it != raftActorId }.map {
+                (0 until nraftActores).filter { it != raftActorId }.map {
                     Send(it, AppendEntryRpc(raftActorId, term, lastLogId, leaderCommit, entry))
                 },
                 AppendLogEntry(entry)
             )
             // responses in random order
-            val ids = (1..nraftActores).filter { it != raftActorId }.shuffled(rnd)
+            val ids = (0 until nraftActores).filter { it != raftActorId }.shuffled(rnd)
             var count = 0
             for (id in ids) {
                 raftActor.onAppendEntryResult(id, AppendEntryResult(term, entry.logId().index))
@@ -801,7 +827,7 @@ class MockTestKt(
                     val result = expectedMachine.apply(command, term) // FIXME
                     expectActions(
                         (leaderCommit + 1..entry.logId().index).map {
-                            ApplyCommandLogEntry(replicatedLogManager.readLog(it)!!, true)
+                            ApplyCommand(replicatedLogManager.readLog(it)!!.command, term)
                         },
                         Send(clientId, ClientCommandResult(term, result))
                     )
@@ -817,9 +843,10 @@ class MockTestKt(
     fun `LEADER reports client command result from old term when it was a follower`() {
         if (term <= 1) return
         val oldTerm = term - 1
+        val oldLeaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
         initLeader()
         val result = rnd.nextCommandResult(oldTerm)
-        raftActor.onClientCommandResult(null, result)
+        raftActor.onClientCommandResult(oldLeaderId, null, result)
         expectActions(
             Result(result)
         )
@@ -831,9 +858,9 @@ class MockTestKt(
         val oldLogId = findOldLogId()
         val oldTerm = oldLogId.term
         val oldIndex = oldLogId.index
-        val oldLeaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val oldLeaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val prevLogId = replicatedLogManager.readLog(oldIndex - 1)?.logId() ?: START_LOG_ID
-        val oldEntry = rnd.nextLogEntry(oldIndex, oldTerm)
+        val oldEntry = rnd.nextLogEntry(oldIndex, oldTerm, this)
         initLeader()
         raftActor.onAppendEntry(AppendEntryRpc(oldLeaderId, oldTerm, prevLogId, oldIndex, oldEntry))
         expectActions(
@@ -851,7 +878,7 @@ class MockTestKt(
     @Test
     fun `LEADER refuses to vote for a stale candidate`() {
         if (term == 0L) return
-        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
+        val candidateId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val oldTerm = rnd.nextLong(0 until term)
         initLeader()
         raftActor.onRequestVote(RequestVoteRpc(candidateId, oldTerm, lastLogId))
@@ -949,15 +976,21 @@ class MockTestKt(
     /** Result of the client command for the original [Command.processId]. Sent by the leader. */
     @Suppress("TestFunctionName")
     private fun ClientCommandResult(term: Long, result: CommandResult): Raft.ClientCommandResponseRPC {
-        return Raft.ClientCommandResponseRPC.newBuilder()
+        val builder = Raft.ClientCommandResponseRPC.newBuilder()
             .setTerm(term)
             .setKey(ByteString.copyFromUtf8(result.key()))
-            .setValue(ByteString.copyFromUtf8(result.value()))
-            .build()
+        if (result.value() != null) {
+            builder.setValue(ByteString.copyFromUtf8(result.value()))
+        }
+        return builder.build()
     }
 
-    private fun RaftActor.onAppendEntry(appendEntriesRequest: AppendEntriesRequest?) =
-        onAppendEntry(appendEntriesRequest) {}
+    private fun RaftActorInterface.onAppendEntry(appendEntriesRequest: AppendEntriesRequest) =
+        onAppendEntry(appendEntriesRequest) {
+            actions += Send(appendEntriesRequest.leaderId, it)
+        }
 
-    private fun RaftActor.onRequestVote(voteRequest: VoteRequest?) = onRequestVote(voteRequest) {}
+    private fun RaftActorInterface.onRequestVote(voteRequest: VoteRequest) = onRequestVote(voteRequest) {
+        actions += Send(voteRequest.candidateId, it)
+    }
 }

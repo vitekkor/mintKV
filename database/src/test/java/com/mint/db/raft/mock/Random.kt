@@ -2,6 +2,7 @@ package com.mint.db.raft.mock
 
 import com.mint.db.dao.impl.BaseEntry
 import com.mint.db.dao.impl.StringDaoWrapper
+import com.mint.db.raft.Environment
 import com.mint.db.raft.model.Command
 import com.mint.db.raft.model.InsertCommand
 import com.mint.db.raft.model.InsertCommandResult
@@ -12,7 +13,6 @@ import com.mint.db.replication.model.impl.OperationType
 import java.lang.foreign.MemorySegment
 import kotlin.random.Random
 import kotlin.random.nextInt
-import kotlin.random.nextLong
 
 private val randomStrings = run {
     val rnd = Random(1)
@@ -29,17 +29,12 @@ fun Random.nextString() = randomStrings.random(this)
 
 fun Random.nextMemorySegment() = StringDaoWrapper.toMemorySegment(randomStrings.random(this))
 
-fun Random.nextCommand(processId: Long) =
-    InsertCommand(processId, nextString(), nextString(), false)
-
 fun Random.nextCommand(processId: Int) =
-    InsertCommand(processId.toLong(), nextString(), nextString(), false)
+    InsertCommand(processId, nextString(), nextString(), false)
 
 fun Random.nextCommandResult(term: Long) = InsertCommandResult(term, nextString())
 
-fun Random.nextCommandId() = nextLong(10L..99L)
-
-fun Random.nextLogEntry(index: Long, term: Long) =
+fun Random.nextLogEntry(index: Long, term: Long, env: Environment<*>) =
     BaseLogEntry<MemorySegment>(
         OperationType.PUT,
         BaseEntry(
@@ -48,7 +43,8 @@ fun Random.nextLogEntry(index: Long, term: Long) =
             null,
             false
         ),
-        LogId(index, term)
+        LogId(index, term),
+        nextInt(0 until env.nProcesses())
     )
 
 fun Command.toLogEntry(logId: LogId): LogEntry<MemorySegment> {
@@ -60,6 +56,7 @@ fun Command.toLogEntry(logId: LogId): LogEntry<MemorySegment> {
             null,
             false
         ),
-        logId
+        logId,
+        processId()
     )
 }

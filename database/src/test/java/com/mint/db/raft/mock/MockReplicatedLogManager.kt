@@ -3,6 +3,7 @@ package com.mint.db.raft.mock
 import com.mint.db.config.NodeConfig
 import com.mint.db.dao.Dao
 import com.mint.db.dao.Entry
+import com.mint.db.raft.Environment
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl
 import com.mint.db.replication.model.LogEntry
 import com.mint.db.replication.model.PersistentState
@@ -12,6 +13,7 @@ import kotlin.random.nextLong
 
 class MockReplicatedLogManager(
     private val actions: ActionSink,
+    env: Environment<*>,
     nodeConfig: NodeConfig,
     state: PersistentState,
     dao: Dao<MemorySegment, Entry<MemorySegment>>,
@@ -22,7 +24,7 @@ class MockReplicatedLogManager(
         var term = 1L
         for (index in 1L..lastLogIndex) {
             term = rnd.nextLong(term..readPersistentState().currentTerm)
-            super.appendLogEntry(rnd.nextLogEntry(index, term))
+            super.appendLogEntry(rnd.nextLogEntry(index, term, env))
         }
     }
 

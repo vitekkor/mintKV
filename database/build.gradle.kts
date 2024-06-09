@@ -33,7 +33,7 @@ dependencies {
     testImplementation("org.powermock:powermock-api-mockito2:2.0.9")
     testImplementation("org.awaitility:awaitility:4.2.1")
     implementation(kotlin("stdlib-jdk8"))
-
+    testImplementation(kotlin("test-junit"))
 }
 
 protobuf {
@@ -70,9 +70,20 @@ sourceSets {
     }
 }
 
-tasks.test {
-    testLogging.showStandardStreams = true
+tasks {
+    test {
+        testLogging.showStandardStreams = true
+    }
+
+    val mockTest by registering(Test::class) {
+        group = "verification"
+        testLogging.showStandardStreams = true
+        filter { includeTestsMatching("*MockTest*") }
+        allJvmArgs = allJvmArgs.toMutableList().apply { add("--enable-preview") }
+    }
 }
+
 kotlin {
     jvmToolchain(21)
 }
+

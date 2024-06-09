@@ -13,7 +13,7 @@ class MockDaoStateMachine(
     dao: Dao<MemorySegment, Entry<MemorySegment>>
 ) : DaoStateMachine(dao) {
     override fun apply(logEntry: LogEntry<MemorySegment>, committed: Boolean): CommandResult {
-        actions += ProcessAction.ApplyCommandLogEntry(logEntry, committed)
+        actions += ProcessAction.ApplyCommand(logEntry.command, logEntry.logId().term)
         return super.apply(logEntry, committed)
     }
 

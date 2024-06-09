@@ -63,6 +63,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("value"),
                 null,
                 0,
+                0,
                 0
         );
         logManager.appendLogEntry(logEntry);
@@ -81,6 +82,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("key"),
                 null,
                 null,
+                0,
                 0,
                 0
         );
@@ -101,6 +103,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("value"),
                 null,
                 0,
+                0,
                 0
         );
         logManager.appendLogEntry(logEntry);
@@ -109,6 +112,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("key2"),
                 StringDaoWrapper.toMemorySegment("value2"),
                 null,
+                1,
                 1,
                 1
         );
@@ -130,6 +134,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("value"),
                 null,
                 0,
+                0,
                 0
         );
         logManager.appendLogEntry(logEntry);
@@ -138,6 +143,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("key2"),
                 StringDaoWrapper.toMemorySegment("value2"),
                 null,
+                1,
                 1,
                 1
         );
@@ -152,6 +158,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("key3"),
                 StringDaoWrapper.toMemorySegment("value3"),
                 null,
+                2,
                 2,
                 2
         );
@@ -172,6 +179,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("value"),
                 null,
                 0,
+                0,
                 0
         );
         logManager.appendLogEntry(logEntry);
@@ -180,6 +188,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("key2"),
                 StringDaoWrapper.toMemorySegment("value2"),
                 null,
+                1,
                 1,
                 1
         );
@@ -190,6 +199,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("value3"),
                 null,
                 2,
+                2,
                 2
         );
         logManager.appendLogEntry(logEntry3);
@@ -199,6 +209,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("value4"),
                 null,
                 1,
+                3,
                 3
         );
         logManager.appendLogEntry(logEntry4);
@@ -212,6 +223,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("value5"),
                 null,
                 2,
+                4,
                 4
         );
         logManager.appendLogEntry(logEntry5);
@@ -234,6 +246,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("value"),
                 null,
                 0,
+                0,
                 0
         );
         logManager.appendLogEntry(logEntry);
@@ -255,6 +268,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("value"),
                 null,
                 0,
+                0,
                 0
         );
         logManager.appendLogEntry(logEntry);
@@ -267,6 +281,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("value2"),
                 null,
                 1,
+                1,
                 1
         );
         logManager2.appendLogEntry(logEntry2);
@@ -277,6 +292,7 @@ public class ReplicatedLogManagerTest {
                 StringDaoWrapper.toMemorySegment("value3"),
                 null,
                 0,
+                2,
                 2
         );
         logManager2.appendLogEntry(logEntry3);
