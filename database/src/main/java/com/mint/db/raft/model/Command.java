@@ -6,7 +6,7 @@ public sealed interface Command permits GetCommand, InsertCommand {
      *
      * @return process id
      */
-    long processId();
+    int processId();
 
     /**
      * Key.

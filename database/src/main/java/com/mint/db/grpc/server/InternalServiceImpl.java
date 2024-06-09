@@ -3,7 +3,7 @@ package com.mint.db.grpc.server;
 import com.google.inject.Inject;
 import com.mint.db.Raft;
 import com.mint.db.RaftServiceGrpc;
-import com.mint.db.grpc.ExternalGrpcActorInterface;
+import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.raft.RaftActorInterface;
 import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.GetCommand;
@@ -13,14 +13,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class InternalServiceImpl extends RaftServiceGrpc.RaftServiceImplBase {
+    private static final Logger logger = LoggerFactory.getLogger(InternalServiceImpl.class);
     private final RaftActorInterface raftActor;
-    private final ExternalGrpcActorInterface externalGrpcActorInterface;
-    private static final Logger logger = LoggerFactory.getLogger(ExternalServiceImpl.class);
+    private final InternalGrpcActorInterface internalGrpcActor;
 
     @Inject
-    public InternalServiceImpl(RaftActorInterface raftActor, ExternalGrpcActorInterface externalGrpcActorInterface) {
+    public InternalServiceImpl(RaftActorInterface raftActor, InternalGrpcActorInterface internalGrpcActor) {
         this.raftActor = raftActor;
-        this.externalGrpcActorInterface = externalGrpcActorInterface;
+        this.internalGrpcActor = internalGrpcActor;
     }
 
     @Override
@@ -46,7 +46,7 @@ public class InternalServiceImpl extends RaftServiceGrpc.RaftServiceImplBase {
     ) {
         var command = clientCommandRequestRPCToCommand(request);
         raftActor.onClientCommand(command);
-        externalGrpcActorInterface.addClientCommandCallback(command, responseObserver);
+        internalGrpcActor.addClientCommandCallback(command, responseObserver);
     }
 
     private Command clientCommandRequestRPCToCommand(Raft.ClientCommandRequestRPC request) {

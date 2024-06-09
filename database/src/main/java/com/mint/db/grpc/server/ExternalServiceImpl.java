@@ -130,8 +130,7 @@ public class ExternalServiceImpl
         );
     }
 
-    @Override
-    public void addClientCommandCallback(Command command, StreamObserver<?> responseObserver) {
+    private void addClientCommandCallback(Command command, StreamObserver<?> responseObserver) {
         commandStreamObserverMap.put(command, responseObserver);
     }
 }

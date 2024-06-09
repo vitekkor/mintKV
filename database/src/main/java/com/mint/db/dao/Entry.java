@@ -12,6 +12,4 @@ public interface Entry<D> {
     default D readUncommittedValue() {
         return uncommittedValueIsNotNull() ? uncommittedValue() : committedValue();
     }
-
-    int processId();
 }

@@ -17,7 +17,7 @@ public interface RaftActorInterface {
      */
     void onAppendEntry(
             Raft.AppendEntriesRequest appendEntriesRequest,
-            Consumer<Raft.AppendEntriesResponse> onVoteResponse
+            Consumer<Raft.AppendEntriesResponse> onAppendEntriesResponse
     );
 
     /**
@@ -50,6 +50,10 @@ public interface RaftActorInterface {
     /**
      * Called on result of client command processing. The {@link Command#processId()} is always equal to the
      * identifier of this process.
+     *
+     * @param srcId         sender process id
+     * @param command       command
+     * @param commandResult command result
      */
-    void onClientCommandResult(Command command, CommandResult commandResult);
+    void onClientCommandResult(int srcId, Command command, CommandResult commandResult);
 }
