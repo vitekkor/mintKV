@@ -11,7 +11,6 @@ import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
 import com.mint.db.raft.model.GetCommand;
 import com.mint.db.raft.model.InsertCommand;
-import com.mint.db.raft.model.InsertCommandResult;
 import com.mint.db.raft.model.LogId;
 import com.mint.db.raft.model.Pair;
 import com.mint.db.replication.ReplicatedLogManager;
