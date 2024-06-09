@@ -73,6 +73,7 @@ sourceSets {
 tasks {
     test {
         testLogging.showStandardStreams = true
+        filter { excludeTestsMatching("*MockTest*") }
     }
 
     val mockTest by registering(Test::class) {
@@ -80,6 +81,10 @@ tasks {
         testLogging.showStandardStreams = true
         filter { includeTestsMatching("*MockTest*") }
         allJvmArgs = allJvmArgs.toMutableList().apply { add("--enable-preview") }
+    }
+
+    check {
+        dependsOn(mockTest)
     }
 }
 

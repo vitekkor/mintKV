@@ -30,7 +30,6 @@ import com.mint.db.replication.model.PersistentState
 import com.mint.db.util.EntryConverter
 import com.mint.db.util.LogUtil
 import org.junit.After
-import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
