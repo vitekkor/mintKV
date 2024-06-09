@@ -112,7 +112,7 @@ class RaftActorTest {
                         internalGrpcActorInvocations,
                         ComparatorMatcherBuilder.comparedBy(Integer::compareTo).comparesEqualTo(1)
                 );
-        Mockito.verify(internalGrpcActor, Mockito.times(4))
+        Mockito.verify(internalGrpcActor, Mockito.times(8))
                 .sendAppendEntriesRequest(
                         Mockito.anyInt(), Mockito.any(Raft.AppendEntriesRequest.class), Mockito.any()
                 );
