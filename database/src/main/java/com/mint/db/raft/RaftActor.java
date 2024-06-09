@@ -1,5 +1,6 @@
 package com.mint.db.raft;
 
+import com.mint.DatabaseServiceOuterClass;
 import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.dao.Entry;
