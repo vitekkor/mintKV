@@ -345,7 +345,7 @@ public class RaftActor implements RaftActorInterface {
             }
 
 
-            LogEntry logEntry = replicatedLogManager.readLog(index);
+            LogEntry<MemorySegment> logEntry = replicatedLogManager.readLog(index);
             boolean isLogTermEqualToCurrentTerm = logEntry != null && logEntry.logId().term() == state.currentTerm();
             if (nodesCount >= quorum(config.getCluster().size()) && isLogTermEqualToCurrentTerm) {
                 Collection<Pair<Command, CommandResult>> leaderResults = new ArrayList<>();
