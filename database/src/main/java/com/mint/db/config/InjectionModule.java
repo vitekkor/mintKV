@@ -4,7 +4,6 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.mint.db.config.annotations.DaoBean;
 import com.mint.db.config.annotations.EnvironmentBean;
-import com.mint.db.config.annotations.ExternalClientsBean;
 import com.mint.db.config.annotations.ExternalGrpcActorBean;
 import com.mint.db.config.annotations.InternalClientsBean;
 import com.mint.db.config.annotations.InternalGrpcActorBean;
@@ -19,7 +18,6 @@ import com.mint.db.dao.impl.BaseDao;
 import com.mint.db.grpc.ExternalGrpcActorInterface;
 import com.mint.db.grpc.InternalGrpcActor;
 import com.mint.db.grpc.InternalGrpcActorInterface;
-import com.mint.db.grpc.client.ExternalGrpcClient;
 import com.mint.db.grpc.client.InternalGrpcClient;
 import com.mint.db.grpc.server.ExternalServiceImpl;
 import com.mint.db.raft.DaoStateMachine;
@@ -123,18 +121,5 @@ public class InjectionModule extends AbstractModule {
             }
         }
         return internalGrpcClients;
-    }
-
-    @Provides
-    @ExternalClientsBean
-    static Map<Integer, ExternalGrpcClient> provideExternalGrpcClients(@NodeConfiguration NodeConfig nodeConfig) {
-        Map<Integer, ExternalGrpcClient> externalGrpcClients = new HashMap<>();
-        for (int nodeId = 0; nodeId < nodeConfig.getCluster().size(); nodeId++) {
-            if (nodeId != nodeConfig.getNodeId()) {
-                String nodeUrl = nodeConfig.getCluster().get(nodeId);
-                externalGrpcClients.put(nodeId, new ExternalGrpcClient(nodeUrl));
-            }
-        }
-        return externalGrpcClients;
     }
 }
