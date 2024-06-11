@@ -9,7 +9,8 @@ import java.util.function.BiConsumer;
 
 public class CallbackKeeper {
 
-    private final Map<Command, BiConsumer<Command, CommandResult>> commandBiConsumerConcurrentHashMap = new ConcurrentHashMap<>();
+    private final Map<Command, BiConsumer<Command, CommandResult>> commandBiConsumerConcurrentHashMap
+            = new ConcurrentHashMap<>();
 
     public void addClientCommandCallback(Command command, BiConsumer<Command, CommandResult> callback) {
         commandBiConsumerConcurrentHashMap.put(command, callback);

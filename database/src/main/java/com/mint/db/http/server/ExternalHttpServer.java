@@ -55,7 +55,7 @@ public class ExternalHttpServer {
         }
     }
 
-    public void onClientCommandResult(Command command, CommandResult commandResult, HttpExchange exchange){
+    public void onClientCommandResult(Command command, CommandResult commandResult, HttpExchange exchange) {
         try {
             if (commandResult instanceof GetCommandResult) {
                 String response;

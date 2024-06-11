@@ -73,7 +73,9 @@ public class ExternalServiceImpl
     }
 
     @Override
-    public void onClientCommandResult(Command command, CommandResult commandResult, StreamObserver<?> responseObserver) {
+    public void onClientCommandResult(
+            Command command, CommandResult commandResult, StreamObserver<?> responseObserver
+    ) {
         if (responseObserver == null) {
             logger.warn("No response observer found for command: {}", command);
             return;
