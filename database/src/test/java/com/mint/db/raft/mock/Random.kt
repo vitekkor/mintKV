@@ -27,10 +27,10 @@ private val randomStrings = run {
 
 fun Random.nextString() = randomStrings.random(this)
 
-fun Random.nextMemorySegment() = StringDaoWrapper.toMemorySegment(randomStrings.random(this))
+fun Random.nextMemorySegment(): MemorySegment = StringDaoWrapper.toMemorySegment(randomStrings.random(this))
 
-fun Random.nextCommand(processId: Int) =
-    InsertCommand(processId, nextString(), nextString(), false)
+fun Random.nextCommand(processId: Int, uncommitted: Boolean = false) =
+    InsertCommand(processId, nextString(), nextString(), uncommitted)
 
 fun Random.nextCommandResult(term: Long) = InsertCommandResult(term, nextString())
 

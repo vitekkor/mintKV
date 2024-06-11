@@ -2,6 +2,7 @@ package com.mint.db.raft.mock
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.Message
+import com.mint.DatabaseServiceOuterClass
 import com.mint.db.Raft
 import com.mint.db.Raft.AppendEntriesRequest
 import com.mint.db.Raft.VoteRequest
@@ -22,6 +23,7 @@ import com.mint.db.raft.mock.ProcessAction.StartTimeout
 import com.mint.db.raft.mock.ProcessAction.WritePersistentState
 import com.mint.db.raft.model.Command
 import com.mint.db.raft.model.CommandResult
+import com.mint.db.raft.model.GetCommand
 import com.mint.db.raft.model.InsertCommand
 import com.mint.db.raft.model.LogId
 import com.mint.db.replication.ReplicatedLogManager
@@ -883,6 +885,39 @@ class MockTest(
         raftActor.onRequestVote(RequestVoteRpc(candidateId, oldTerm, lastLogId))
         expectActions(
             Send(candidateId, RequestVoteResult(term, false))
+        )
+    }
+
+    @Test
+    fun `Insert uncommitted and read committed`() {
+        initLeader()
+        // insert command
+        val insertCommand = rnd.nextCommand(raftActorId, true)
+        val lastLogId1 = lastLogId
+        val entry1 = insertCommand.toLogEntry(LogId(lastLogId1.index + 1, term))
+
+        val expectedMachine = DaoStateMachine(BaseDao())
+        val insertResult = expectedMachine.apply(insertCommand, term)
+
+        raftActor.onClientCommand(insertCommand)
+
+        expectActions(
+            (0 until nraftActores).filter { it != raftActorId }.map {
+                Send(it, AppendEntryRpc(raftActorId, term, lastLogId1, 0, entry1))
+            },
+            AppendLogEntry(entry1),
+            ApplyCommand(insertCommand, term),
+            Result(insertResult)
+        )
+        // read value
+        val getCommand = GetCommand(insertCommand.processId, insertCommand.key, DatabaseServiceOuterClass.ReadMode.READ_COMMITTED)
+        raftActor.onClientCommand(getCommand)
+
+        val getResult = expectedMachine.apply(getCommand, term)
+
+        expectActions(
+            ApplyCommand(getCommand, term),
+            Result(getResult)
         )
     }
 
