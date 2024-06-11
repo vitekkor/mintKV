@@ -93,7 +93,7 @@ public class ExternalHttpServer {
             return;
         }
         Command command = converInsertRequestDtoToInsertCommand(request);
-
+        addClientCommandCallback(command, exchange);
         raftActor.onClientCommand(command);
     }
 
@@ -109,6 +109,7 @@ public class ExternalHttpServer {
             return;
         }
         Command command = converGetRequestDtoToGetCommand(request);
+        addClientCommandCallback(command, exchange);
         raftActor.onClientCommand(command);
     }
 
@@ -123,6 +124,7 @@ public class ExternalHttpServer {
             return;
         }
         Command command = converDeleteRequestDtoToDeleteCommand(request);
+        addClientCommandCallback(command, exchange);
         raftActor.onClientCommand(command);
     }
 
