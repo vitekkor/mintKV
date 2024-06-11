@@ -4,6 +4,7 @@ import com.mint.db.dao.impl.BaseEntry
 import com.mint.db.dao.impl.StringDaoWrapper
 import com.mint.db.raft.Environment
 import com.mint.db.raft.model.Command
+import com.mint.db.raft.model.GetCommand
 import com.mint.db.raft.model.InsertCommand
 import com.mint.db.raft.model.InsertCommandResult
 import com.mint.db.raft.model.LogId
@@ -48,8 +49,12 @@ fun Random.nextLogEntry(index: Long, term: Long, env: Environment<*>) =
     )
 
 fun Command.toLogEntry(logId: LogId): LogEntry<MemorySegment> {
+    val operationType = when (this) {
+        is InsertCommand -> if (value != null ) OperationType.PUT else OperationType.DELETE
+        is GetCommand -> OperationType.GET
+    }
     return BaseLogEntry(
-        OperationType.PUT,
+        operationType,
         BaseEntry(
             StringDaoWrapper.toMemorySegment(key()),
             StringDaoWrapper.toMemorySegment(value()),

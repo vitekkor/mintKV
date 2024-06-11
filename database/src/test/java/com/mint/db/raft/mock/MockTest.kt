@@ -24,7 +24,9 @@ import com.mint.db.raft.mock.ProcessAction.WritePersistentState
 import com.mint.db.raft.model.Command
 import com.mint.db.raft.model.CommandResult
 import com.mint.db.raft.model.GetCommand
+import com.mint.db.raft.model.GetCommandResult
 import com.mint.db.raft.model.InsertCommand
+import com.mint.db.raft.model.InsertCommandResult
 import com.mint.db.raft.model.LogId
 import com.mint.db.replication.ReplicatedLogManager
 import com.mint.db.replication.model.LogEntry
@@ -785,7 +787,7 @@ class MockTest(
             for (id in ids) {
                 raftActor.onAppendEntryResult(id, AppendEntryResult(term, entry.logId().index))
                 if (++count == nraftActores / 2) { // commit on majority of answers
-                    val result = expectedMachine.apply(command, term) // FIXME
+                    val result = expectedMachine.apply(command, term)
                     expectActions(
                         (leaderCommit + 1..entry.logId().index).map {
                             ApplyCommand(replicatedLogManager.readLog(it)!!.command, term)
@@ -825,7 +827,7 @@ class MockTest(
             for (id in ids) {
                 raftActor.onAppendEntryResult(id, AppendEntryResult(term, entry.logId().index))
                 if (++count == nraftActores / 2) { // commit on majority of answers
-                    val result = expectedMachine.apply(command, term) // FIXME
+                    val result = expectedMachine.apply(command, term)
                     expectActions(
                         (leaderCommit + 1..entry.logId().index).map {
                             ApplyCommand(replicatedLogManager.readLog(it)!!.command, term)
@@ -896,8 +898,7 @@ class MockTest(
         val lastLogId1 = lastLogId
         val entry1 = insertCommand.toLogEntry(LogId(lastLogId1.index + 1, term))
 
-        val expectedMachine = DaoStateMachine(BaseDao())
-        val insertResult = expectedMachine.apply(insertCommand, term)
+        val insertResult = InsertCommandResult(term, insertCommand.key)
 
         raftActor.onClientCommand(insertCommand)
 
@@ -910,10 +911,44 @@ class MockTest(
             Result(insertResult)
         )
         // read value
-        val getCommand = GetCommand(insertCommand.processId, insertCommand.key, DatabaseServiceOuterClass.ReadMode.READ_COMMITTED)
+        val getCommand =
+            GetCommand(insertCommand.processId, insertCommand.key, DatabaseServiceOuterClass.ReadMode.READ_COMMITTED)
         raftActor.onClientCommand(getCommand)
 
-        val getResult = expectedMachine.apply(getCommand, term)
+        val getResult = GetCommandResult(term, getCommand.key, null)
+
+        expectActions(
+            ApplyCommand(getCommand, term),
+            Result(getResult)
+        )
+    }
+
+    @Test
+    fun `Insert uncommitted and read uncommitted`() {
+        initLeader()
+        // insert command
+        val insertCommand = rnd.nextCommand(raftActorId, true)
+        val lastLogId1 = lastLogId
+        val entry1 = insertCommand.toLogEntry(LogId(lastLogId1.index + 1, term))
+
+        val insertResult = InsertCommandResult(term, insertCommand.key)
+
+        raftActor.onClientCommand(insertCommand)
+
+        expectActions(
+            (0 until nraftActores).filter { it != raftActorId }.map {
+                Send(it, AppendEntryRpc(raftActorId, term, lastLogId1, 0, entry1))
+            },
+            AppendLogEntry(entry1),
+            ApplyCommand(insertCommand, term),
+            Result(insertResult)
+        )
+        // read value
+        val getCommand =
+            GetCommand(insertCommand.processId, insertCommand.key, DatabaseServiceOuterClass.ReadMode.READ_LOCAL)
+        raftActor.onClientCommand(getCommand)
+
+        val getResult = GetCommandResult(term, getCommand.key, insertCommand.value)
 
         expectActions(
             ApplyCommand(getCommand, term),
