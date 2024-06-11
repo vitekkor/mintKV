@@ -956,6 +956,86 @@ class MockTest(
         )
     }
 
+    @Test
+    fun `Insert uncommitted, read consensus`() {
+        initLeader()
+
+        // ---------------------------- insert command ----------------------------
+        val insertCommand = rnd.nextCommand(raftActorId, true)
+        var localLastLogId = lastLogId
+        val entry = insertCommand.toLogEntry(LogId(localLastLogId.index + 1, term))
+
+        val insertResult = InsertCommandResult(term, insertCommand.key)
+
+        raftActor.onClientCommand(insertCommand)
+
+        expectActions(
+            (0 until nraftActores).filter { it != raftActorId }.map {
+                Send(it, AppendEntryRpc(raftActorId, term, localLastLogId, 0, entry))
+            },
+            AppendLogEntry(entry),
+            ApplyCommand(insertCommand, term),
+            Result(insertResult)
+        )
+        // ---------------------------- insert command ----------------------------
+
+
+        // ---------------------------- responses in random order ----------------------------
+        var leaderCommit = 0L
+        var count = 0
+        var ids = (0 until nraftActores).filter { it != raftActorId }.shuffled(rnd)
+        for (id in ids) {
+            raftActor.onAppendEntryResult(id, AppendEntryResult(term, entry.logId().index))
+            if (++count == nraftActores / 2) { // commit on majority of answers
+                expectActions(
+                    (leaderCommit + 1..entry.logId().index).map {
+                        ApplyCommand(replicatedLogManager.readLog(it)!!.command, term)
+                    },
+                    Result(insertResult)
+                )
+            } else {
+                expectActions() // nothing special otherwise
+            }
+        }
+        leaderCommit = entry.logId().index
+        // ---------------------------- responses in random order ----------------------------
+
+
+        // ---------------------------- read value ----------------------------
+        localLastLogId = lastLogId
+        val getCommand =
+            GetCommand(insertCommand.processId, insertCommand.key, DatabaseServiceOuterClass.ReadMode.READ_CONSENSUS)
+        raftActor.onClientCommand(getCommand)
+        val getEntry = getCommand.toLogEntry(LogId(localLastLogId.index + 1, term))
+        expectActions(
+            (0 until nraftActores).filter { it != raftActorId }.map {
+                Send(it, AppendEntryRpc(raftActorId, term, localLastLogId, leaderCommit, getEntry))
+            },
+            AppendLogEntry(getEntry)
+        )
+        // ---------------------------- read value ----------------------------
+
+
+        // ---------------------------- responses in random order ----------------------------
+        val getResult = GetCommandResult(term, getCommand.key, insertCommand.value)
+        count = 0
+        ids = (0 until nraftActores).filter { it != raftActorId }.shuffled(rnd)
+        for (id in ids) {
+            raftActor.onAppendEntryResult(id, AppendEntryResult(term, getEntry.logId().index))
+            if (++count == nraftActores / 2) { // commit on majority of answers
+                expectActions(
+                    (leaderCommit + 1..getEntry.logId().index).map {
+                        ApplyCommand(replicatedLogManager.readLog(it)!!.command, term)
+                    },
+                    Result(getResult)
+                )
+            } else {
+                expectActions() // nothin special otherwise
+            }
+        }
+        // ---------------------------- responses in random order ----------------------------
+    }
+
     private fun expectActions(expected: List<ProcessAction>, vararg more: ProcessAction) =
         expectActions(*expected.toTypedArray(), *more)
 

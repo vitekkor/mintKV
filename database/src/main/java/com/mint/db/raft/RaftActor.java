@@ -594,12 +594,7 @@ public class RaftActor implements RaftActorInterface {
     private void handleGetCommandAsLeader(GetCommand command, PersistentState state, LogId lastLogId) {
         switch (command.readMode()) {
             case READ_CONSENSUS -> {
-                Entry<MemorySegment> entry = new BaseEntry<>(
-                        StringDaoWrapper.toMemorySegment(command.key()),
-                        StringDaoWrapper.toMemorySegment(command.value()),
-                        StringDaoWrapper.toMemorySegment(command.value()),
-                        false
-                );
+                Entry<MemorySegment> entry = createEntryFromGetCommand(command);
                 LogEntry<MemorySegment> logEntry = createLogEntryFromEntry(
                         OperationType.GET,
                         entry,
@@ -621,6 +616,15 @@ public class RaftActor implements RaftActorInterface {
 
             default -> throw new IllegalArgumentException("UNRECOGNIZED readMode");
         }
+    }
+
+    private Entry<MemorySegment> createEntryFromGetCommand(GetCommand command) {
+        return new BaseEntry<>(
+                StringDaoWrapper.toMemorySegment(command.key()),
+                null,
+                null,
+                false
+        );
     }
 
     private Entry<MemorySegment> createEntryFromInsertCommand(InsertCommand command) {
