@@ -1,10 +1,12 @@
 package com.mint.db.http.server;
 
 import com.google.inject.Inject;
+import com.mint.DatabaseServiceOuterClass;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.config.annotations.CallbackKeeperBean;
 import com.mint.db.config.annotations.NodeConfiguration;
 import com.mint.db.config.annotations.RaftActorBean;
+import com.mint.db.http.server.dto.DeleteRequestDto;
 import com.mint.db.http.server.dto.GetRequestDto;
 import com.mint.db.http.server.dto.InsertRequestDto;
 import com.mint.db.raft.RaftActor;
@@ -111,7 +113,7 @@ public class ExternalHttpServer {
     }
 
     private void handleDelete(HttpExchange exchange) throws IOException {
-        InsertRequestDto request = InsertRequestDto.valueOf(exchange);
+        DeleteRequestDto request = DeleteRequestDto.valueOf(exchange);
         if (request == null) {
             try {
                 exchange.sendResponseHeaders(400, 0);
@@ -120,7 +122,7 @@ public class ExternalHttpServer {
             }
             return;
         }
-        Command command = converInsertRequestDtoToInsertCommand(request);
+        Command command = converDeleteRequestDtoToDeleteCommand(request);
         raftActor.onClientCommand(command);
     }
 
@@ -138,6 +140,15 @@ public class ExternalHttpServer {
                 nodeConfig.getNodeId(),
                 request.key(),
                 request.readMode()
+        );
+    }
+
+    private Command converDeleteRequestDtoToDeleteCommand(DeleteRequestDto request) {
+        return new InsertCommand(
+                nodeConfig.getNodeId(),
+                request.key(),
+                null,
+                request.uncommitted()
         );
     }
 
