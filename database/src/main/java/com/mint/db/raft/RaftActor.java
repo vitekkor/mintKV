@@ -6,6 +6,7 @@ import com.mint.db.dao.impl.BaseEntry;
 import com.mint.db.dao.impl.StringDaoWrapper;
 import com.mint.db.grpc.ExternalGrpcActorInterface;
 import com.mint.db.grpc.InternalGrpcActorInterface;
+import com.mint.db.http.server.CallbackKeeper;
 import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
 import com.mint.db.raft.model.GetCommand;
@@ -50,7 +51,7 @@ public class RaftActor implements RaftActorInterface {
     private final int nodeId;
     private final ScheduledExecutorService scheduledExecutor;
     private final Queue<Command> queue = new ArrayDeque<>();
-    private final ExternalGrpcActorInterface externalGrpcActorInterface;
+    private final CallbackKeeper callbackKeeper;
     private ScheduledFuture<?> scheduledFuture;
     private int votedForMe = 0;
     private int leaderId = -1;
@@ -62,12 +63,12 @@ public class RaftActor implements RaftActorInterface {
     public RaftActor(
             InternalGrpcActorInterface internalGrpcActor,
             Environment<MemorySegment> environment,
-            ExternalGrpcActorInterface externalGrpcActorInterface
+            CallbackKeeper callbackKeeper
     ) {
         this.internalGrpcActor = internalGrpcActor;
         this.env = environment;
 
-        this.externalGrpcActorInterface = externalGrpcActorInterface;
+        this.callbackKeeper = callbackKeeper;
         this.scheduledExecutor = Executors.newScheduledThreadPool(POOL_SIZE);
 
         this.nodeId = env.nodeId();
@@ -392,7 +393,7 @@ public class RaftActor implements RaftActorInterface {
 
                 // send results to client
                 for (Pair<Command, CommandResult> leaderResult : leaderResults) {
-                    externalGrpcActorInterface.onClientCommandResult(leaderResult.first(), leaderResult.second());
+                    callbackKeeper.onClientCommandResult(leaderResult.first(), leaderResult.second());
                 }
 
                 // update commit index
@@ -415,7 +416,6 @@ public class RaftActor implements RaftActorInterface {
         LogEntry<MemorySegment> prevLogEntry = env.replicatedLogManager().readLog(prevLogIndex);
         LogId prevLogId = prevLogEntry != null ? prevLogEntry.logId() : START_LOG_ID;
 
-        //RPC-запрос AppendEntriesRequest для узла srcIdс с целью синхронизации его лога с лидером
         Raft.AppendEntriesRequest appendEntriesRequest = Raft.AppendEntriesRequest.newBuilder()
                 .setTerm(env.replicatedLogManager().readPersistentState().currentTerm())
                 .setPrevLogIndex(prevLogId.index())
@@ -541,7 +541,7 @@ public class RaftActor implements RaftActorInterface {
         int leaderId = srcId;
         if (commandResult.term() > state.currentTerm()) {
             logger.debug("Command result with newest term received. Became a follower");
-            externalGrpcActorInterface.onClientCommandResult(command, commandResult);
+            callbackKeeper.onClientCommandResult(command, commandResult);
             env.replicatedLogManager().writePersistentState(new PersistentState(commandResult.term()));
             this.leaderId = leaderId;
             startTimeout(Timeout.ELECTION_TIMEOUT);
@@ -550,7 +550,7 @@ public class RaftActor implements RaftActorInterface {
                 internalGrpcActor.sendClientCommand(leaderId, command, this::onClientCommandResult);
             }
         } else {
-            externalGrpcActorInterface.onClientCommandResult(command, commandResult);
+            callbackKeeper.onClientCommandResult(command, commandResult);
         }
     }
 
@@ -584,7 +584,7 @@ public class RaftActor implements RaftActorInterface {
             if (isClusterReadyToAcceptEntries(logEntry)) {
                 sendAppendEntriesRequest(state, logEntry, lastLogId);
             }
-            externalGrpcActorInterface.onClientCommandResult(command, commandResult);
+            callbackKeeper.onClientCommandResult(command, commandResult);
         } else if (isClusterReadyToAcceptEntries(logEntry)) {
             sendAppendEntriesRequest(state, logEntry, lastLogId);
         }
@@ -616,7 +616,7 @@ public class RaftActor implements RaftActorInterface {
 
             case READ_LOCAL, READ_COMMITTED -> {
                 CommandResult commandResult = env.stateMachine().apply(command, state.currentTerm());
-                externalGrpcActorInterface.onClientCommandResult(command, commandResult);
+                callbackKeeper.onClientCommandResult(command, commandResult);
             }
 
             default -> throw new IllegalArgumentException("UNRECOGNIZED readMode");

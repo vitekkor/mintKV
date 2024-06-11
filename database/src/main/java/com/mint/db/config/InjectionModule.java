@@ -2,6 +2,7 @@ package com.mint.db.config;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
+import com.mint.db.config.annotations.CallbackKeeperBean;
 import com.mint.db.config.annotations.DaoBean;
 import com.mint.db.config.annotations.EnvironmentBean;
 import com.mint.db.config.annotations.ExternalGrpcActorBean;
@@ -15,11 +16,11 @@ import com.mint.db.config.annotations.StateMachineBean;
 import com.mint.db.dao.Dao;
 import com.mint.db.dao.Entry;
 import com.mint.db.dao.impl.BaseDao;
-import com.mint.db.grpc.ExternalGrpcActorInterface;
 import com.mint.db.grpc.InternalGrpcActor;
 import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.grpc.client.InternalGrpcClient;
 import com.mint.db.grpc.server.ExternalServiceImpl;
+import com.mint.db.http.server.CallbackKeeper;
 import com.mint.db.raft.DaoStateMachine;
 import com.mint.db.raft.Environment;
 import com.mint.db.raft.EnvironmentImpl;
@@ -44,6 +45,12 @@ public class InjectionModule extends AbstractModule {
     }
 
     @Provides
+    @CallbackKeeperBean
+    static CallbackKeeper provideCallbackKeeper() {
+        return new CallbackKeeper();
+    }
+
+    @Provides
     @NodeConfiguration
     static NodeConfig proviceNodeConfig() throws FileNotFoundException {
         return ConfigParser.parseConfig();
@@ -61,9 +68,10 @@ public class InjectionModule extends AbstractModule {
     @ExternalGrpcActorBean
     static ExternalServiceImpl provideExternalGrpcActorInterface(
             @NodeConfiguration NodeConfig nodeConfig,
-            @RaftActorBean RaftActor raftActor
+            @RaftActorBean RaftActor raftActor,
+            @CallbackKeeperBean CallbackKeeper callbackKeeper
     ) {
-        return new ExternalServiceImpl(nodeConfig, raftActor);
+        return new ExternalServiceImpl(nodeConfig, raftActor, callbackKeeper);
     }
 
     @Provides
@@ -105,9 +113,9 @@ public class InjectionModule extends AbstractModule {
     static RaftActorInterface provideRaftActorInterface(
             @InternalGrpcActorBean InternalGrpcActorInterface internalGrpcActor,
             @EnvironmentBean Environment<MemorySegment> environment,
-            @ExternalGrpcActorBean ExternalGrpcActorInterface externalGrpcActor
+            @CallbackKeeperBean CallbackKeeper callbackKeeper
     ) {
-        return new RaftActor(internalGrpcActor, environment, externalGrpcActor);
+        return new RaftActor(internalGrpcActor, environment, callbackKeeper);
     }
 
     @Provides

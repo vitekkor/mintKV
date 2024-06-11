@@ -9,6 +9,7 @@ import com.mint.db.config.NodeConfig
 import com.mint.db.dao.impl.BaseDao
 import com.mint.db.dao.impl.StringDaoWrapper
 import com.mint.db.grpc.ExternalGrpcActorInterface
+import com.mint.db.http.server.CallbackKeeper
 import com.mint.db.raft.DaoStateMachine
 import com.mint.db.raft.Environment
 import com.mint.db.raft.RaftActorInterface
@@ -139,7 +140,7 @@ class MockTest(
     private val term: Long get() = replicatedLogManager.readPersistentState().currentTerm
     private val lastLogId: LogId get() = replicatedLogManager.readLastLogId()
 
-    private var externalGrpcActorInterface = Mockito.mock(ExternalGrpcActorInterface::class.java).apply {
+    private var callbackKeeper = Mockito.mock(CallbackKeeper::class.java).apply {
         Mockito.`when`(this.onClientCommandResult(Mockito.any(), Mockito.any())).thenAnswer {
             actions += Result(it.getArgument(1))
             null
@@ -158,7 +159,7 @@ class MockTest(
         actions += Send(destId, message)
     }
 
-    private val raftActor = RaftActorForMockTest(this, internalGrpcActor, this, externalGrpcActorInterface)
+    private val raftActor = RaftActorForMockTest(this, internalGrpcActor, this, callbackKeeper)
 
     @Before
     fun initFollower() {

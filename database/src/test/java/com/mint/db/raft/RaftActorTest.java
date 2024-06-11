@@ -5,6 +5,7 @@ import com.mint.db.config.NodeConfig;
 import com.mint.db.dao.impl.BaseDao;
 import com.mint.db.grpc.InternalGrpcActor;
 import com.mint.db.grpc.server.ExternalServiceImpl;
+import com.mint.db.http.server.CallbackKeeper;
 import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
@@ -56,7 +57,8 @@ class RaftActorTest {
         List<RaftActor> cluster = new ArrayList<>(5);
 
         InternalGrpcActor internalGrpcActor = Mockito.mock(InternalGrpcActor.class);
-        ExternalServiceImpl externalGrpcActor = Mockito.mock(ExternalServiceImpl.class);
+        CallbackKeeper callbackKeeper = Mockito.mock(CallbackKeeper.class);
+
         AtomicInteger internalGrpcActorInvocations = new AtomicInteger();
         Mockito.doAnswer(invocation -> {
             Raft.VoteRequest voteRequest = invocation.getArgument(0);
@@ -96,7 +98,7 @@ class RaftActorTest {
             RaftActor raftActor = new RaftActor(
                     internalGrpcActor,
                     env,
-                    externalGrpcActor
+                    callbackKeeper
             );
             cluster.add(raftActor);
         }

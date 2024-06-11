@@ -3,6 +3,7 @@ package com.mint.db.raft.mock
 import com.mint.db.Raft
 import com.mint.db.grpc.ExternalGrpcActorInterface
 import com.mint.db.grpc.InternalGrpcActorInterface
+import com.mint.db.http.server.CallbackKeeper
 import com.mint.db.raft.Environment
 import com.mint.db.raft.RaftActor
 import com.mint.db.raft.RaftActorInterface
@@ -16,9 +17,9 @@ class RaftActorForMockTest(
     private val actionSink: ActionSink,
     internalGrpcActor: InternalGrpcActorInterface,
     environment: Environment<MemorySegment>,
-    externalGrpcActorInterface: ExternalGrpcActorInterface
+    callbackKeeper: CallbackKeeper
 ) : RaftActorInterface {
-    private val delegate = object : RaftActor(internalGrpcActor, environment, externalGrpcActorInterface) {
+    private val delegate = object : RaftActor(internalGrpcActor, environment, callbackKeeper) {
         override fun startTimeout(timeout: Timeout) {
             actionSink.removeActionIf { it is ProcessAction.StartTimeout }
             actionSink += ProcessAction.StartTimeout(timeout)
