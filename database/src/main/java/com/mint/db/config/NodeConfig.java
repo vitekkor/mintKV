@@ -15,14 +15,14 @@ public final class NodeConfig {
     }
 
     public NodeConfig(
-            int hhtpPort,
+            int httpPort,
             int port,
             int nodeId,
             String logDir,
             long heartbeatTimeoutMs,
             List<String> cluster
     ) {
-        this.httpPort = hhtpPort;
+        this.httpPort = httpPort;
         this.port = port;
         this.nodeId = nodeId;
         this.heartbeatTimeoutMs = heartbeatTimeoutMs;
