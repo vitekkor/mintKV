@@ -14,7 +14,14 @@ public final class NodeConfig {
 
     }
 
-    public NodeConfig(int hhtpPort, int port, int nodeId, String logDir, long heartbeatTimeoutMs, List<String> cluster) {
+    public NodeConfig(
+            int hhtpPort,
+            int port,
+            int nodeId,
+            String logDir,
+            long heartbeatTimeoutMs,
+            List<String> cluster
+    ) {
         this.httpPort = hhtpPort;
         this.port = port;
         this.nodeId = nodeId;
@@ -46,6 +53,7 @@ public final class NodeConfig {
     public void setPort(int port) {
         this.port = port;
     }
+
     public void setHttpPort(int httpPort) {
         this.httpPort = httpPort;
     }
