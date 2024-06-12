@@ -32,7 +32,6 @@ dependencies {
     testImplementation("org.powermock:powermock-module-junit4:2.0.9")
     testImplementation("org.powermock:powermock-api-mockito2:2.0.9")
     testImplementation("org.awaitility:awaitility:4.2.1")
-    implementation(kotlin("stdlib-jdk8"))
     testImplementation(kotlin("test-junit"))
 }
 
@@ -83,12 +82,20 @@ tasks {
         allJvmArgs = allJvmArgs.toMutableList().apply { add("--enable-preview") }
     }
 
+    val integrationTest by registering(Test::class) {
+        group = "verification"
+        testLogging.showStandardStreams = true
+        filter { includeTestsMatching("*IntegrationTest*") }
+        allJvmArgs = allJvmArgs.toMutableList().apply { add("--enable-preview") }
+        useJUnitPlatform()
+    }
+
     check {
         dependsOn(mockTest)
+        dependsOn(integrationTest)
     }
 }
 
 kotlin {
     jvmToolchain(21)
 }
-
