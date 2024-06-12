@@ -4,7 +4,6 @@ import com.mint.db.Raft;
 import com.mint.db.dao.Entry;
 import com.mint.db.dao.impl.BaseEntry;
 import com.mint.db.dao.impl.StringDaoWrapper;
-import com.mint.db.grpc.ExternalGrpcActorInterface;
 import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.http.server.CallbackKeeper;
 import com.mint.db.raft.model.Command;

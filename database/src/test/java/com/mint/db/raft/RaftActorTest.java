@@ -4,9 +4,7 @@ import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.dao.impl.BaseDao;
 import com.mint.db.grpc.InternalGrpcActor;
-import com.mint.db.grpc.server.ExternalServiceImpl;
 import com.mint.db.http.server.CallbackKeeper;
-import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
 import com.mint.db.replication.model.PersistentState;
@@ -16,7 +14,6 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
-import org.mockito.invocation.InvocationOnMock;
 import org.powermock.modules.junit4.PowerMockRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +39,7 @@ class RaftActorTest {
         Path logDir = Files.createTempDirectory("mintKVLogDir");
         NodeConfig config = new NodeConfig(
                 8080,
+                8090,
                 0,
                 logDir.toString(),
                 5000L,

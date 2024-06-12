@@ -3,6 +3,7 @@ package com.mint.db.config;
 import java.util.List;
 
 public final class NodeConfig {
+    private int httpPort;
     private int port;
     private int nodeId;
     private String logDir;
@@ -13,7 +14,15 @@ public final class NodeConfig {
 
     }
 
-    public NodeConfig(int port, int nodeId, String logDir, long heartbeatTimeoutMs, List<String> cluster) {
+    public NodeConfig(
+            int httpPort,
+            int port,
+            int nodeId,
+            String logDir,
+            long heartbeatTimeoutMs,
+            List<String> cluster
+    ) {
+        this.httpPort = httpPort;
         this.port = port;
         this.nodeId = nodeId;
         this.heartbeatTimeoutMs = heartbeatTimeoutMs;
@@ -23,6 +32,10 @@ public final class NodeConfig {
 
     public int getPort() {
         return port;
+    }
+
+    public int getHttpPort() {
+        return httpPort;
     }
 
     public int getNodeId() {
@@ -41,6 +54,10 @@ public final class NodeConfig {
         this.port = port;
     }
 
+    public void setHttpPort(int httpPort) {
+        this.httpPort = httpPort;
+    }
+
     public void setNodeId(int nodeId) {
         this.nodeId = nodeId;
     }
@@ -54,7 +71,7 @@ public final class NodeConfig {
     }
 
     public NodeConfig copy() {
-        return new NodeConfig(port, nodeId, logDir, heartbeatTimeoutMs, cluster);
+        return new NodeConfig(httpPort, port, nodeId, logDir, heartbeatTimeoutMs, cluster);
     }
 
     public void setHeartbeatTimeoutMs(long heartbeatTimeoutMs) {

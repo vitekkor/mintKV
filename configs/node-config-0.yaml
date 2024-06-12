@@ -1,4 +1,5 @@
-port: 8083
+port: 8085
+httpPort: 8091
 nodeId: 0
 heartbeatTimeoutMs: 5000
 cluster: ["localhost:8080", "localhost:8081", "localhost:8082"]

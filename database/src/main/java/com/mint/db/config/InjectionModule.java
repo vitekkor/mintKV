@@ -25,11 +25,11 @@ import com.mint.db.raft.DaoStateMachine;
 import com.mint.db.raft.Environment;
 import com.mint.db.raft.EnvironmentImpl;
 import com.mint.db.raft.RaftActor;
-import com.mint.db.raft.RaftActorInterface;
 import com.mint.db.raft.StateMachine;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
 import com.mint.db.replication.model.PersistentState;
+import jakarta.inject.Singleton;
 
 import java.io.FileNotFoundException;
 import java.lang.foreign.MemorySegment;
@@ -110,7 +110,8 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @RaftActorBean
-    static RaftActorInterface provideRaftActorInterface(
+    @Singleton
+    static RaftActor provideRaftActorInterface(
             @InternalGrpcActorBean InternalGrpcActorInterface internalGrpcActor,
             @EnvironmentBean Environment<MemorySegment> environment,
             @CallbackKeeperBean CallbackKeeper callbackKeeper
@@ -120,6 +121,7 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @InternalClientsBean
+    @Singleton
     static Map<Integer, InternalGrpcClient> provideInternalGrpcClients(@NodeConfiguration NodeConfig nodeConfig) {
         Map<Integer, InternalGrpcClient> internalGrpcClients = new HashMap<>();
         for (int nodeId = 0; nodeId < nodeConfig.getCluster().size(); nodeId++) {

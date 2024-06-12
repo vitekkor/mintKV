@@ -1,7 +1,6 @@
 package com.mint.db.http.server;
 
 import com.google.inject.Inject;
-import com.mint.DatabaseServiceOuterClass;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.config.annotations.CallbackKeeperBean;
 import com.mint.db.config.annotations.NodeConfiguration;
@@ -44,7 +43,7 @@ public class ExternalHttpServer {
         this.raftActor = raftActor;
         this.callbackKeeper = callbackKeeper;
         try {
-            this.server = HttpServer.create(new InetSocketAddress(config.getPort()), 0);
+            this.server = HttpServer.create(new InetSocketAddress(config.getHttpPort()), 0);
             ExecutorService executor = Executors.newFixedThreadPool(10);
             server.setExecutor(executor);
             server.createContext("/insert", this::handleInsert);
