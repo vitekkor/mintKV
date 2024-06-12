@@ -2,9 +2,12 @@ package com.mint.db.raft;
 
 import com.mint.db.Raft;
 import com.mint.db.config.NodeConfig;
-import com.mint.db.config.annotations.ExternalGrpcActorBean;
+import com.mint.db.dao.impl.BaseDao;
 import com.mint.db.grpc.InternalGrpcActor;
 import com.mint.db.grpc.server.ExternalServiceImpl;
+import com.mint.db.raft.model.LogId;
+import com.mint.db.replication.ReplicatedLogManager;
+import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
 import com.mint.db.replication.model.PersistentState;
 import org.awaitility.Awaitility;
 import org.hamcrest.comparator.ComparatorMatcherBuilder;
@@ -12,11 +15,13 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mockito;
+import org.mockito.invocation.InvocationOnMock;
 import org.powermock.modules.junit4.PowerMockRunner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.lang.foreign.MemorySegment;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -82,10 +87,15 @@ class RaftActorTest {
             nodeConfig.setPort(8080 + i);
             Mockito.when(nodeConfig.heartbeatRandom()).thenReturn(false);
 
+            ReplicatedLogManager<MemorySegment> replicatedLogManager =
+                    new ReplicatedLogManagerImpl(nodeConfig, new PersistentState(), new BaseDao());
+
+            StateMachine<MemorySegment> stateMachine = Mockito.mock(DaoStateMachine.class);
+            Environment<MemorySegment> env = new EnvironmentImpl(nodeConfig, replicatedLogManager, stateMachine);
+
             RaftActor raftActor = new RaftActor(
                     internalGrpcActor,
-                    nodeConfig,
-                    new PersistentState(),
+                    env,
                     externalGrpcActor
             );
             cluster.add(raftActor);
@@ -102,7 +112,7 @@ class RaftActorTest {
                         internalGrpcActorInvocations,
                         ComparatorMatcherBuilder.comparedBy(Integer::compareTo).comparesEqualTo(1)
                 );
-        Mockito.verify(internalGrpcActor, Mockito.times(4))
+        Mockito.verify(internalGrpcActor, Mockito.times(8))
                 .sendAppendEntriesRequest(
                         Mockito.anyInt(), Mockito.any(Raft.AppendEntriesRequest.class), Mockito.any()
                 );

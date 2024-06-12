@@ -47,7 +47,7 @@ public class ExternalServiceImpl
     ) {
         logger.debug("Received insert request: {}", request);
         Command command = convertInsertRequestToCommand(request);
-        commandStreamObserverMap.put(command, responseObserver);
+        addClientCommandCallback(command, responseObserver);
         raftActor.onClientCommand(command);
     }
 
@@ -58,7 +58,7 @@ public class ExternalServiceImpl
     ) {
         logger.debug("Received delete request: {}", request);
         Command command = convertDeleteRequestToCommand(request);
-        commandStreamObserverMap.put(command, responseObserver);
+        addClientCommandCallback(command, responseObserver);
         raftActor.onClientCommand(command);
     }
 
@@ -69,7 +69,7 @@ public class ExternalServiceImpl
     ) {
         logger.debug("Received get request: {}", request);
         Command command = convertGetRequestToCommand(request);
-        commandStreamObserverMap.put(command, responseObserver);
+        addClientCommandCallback(command, responseObserver);
         raftActor.onClientCommand(command);
     }
 
@@ -130,5 +130,9 @@ public class ExternalServiceImpl
                 request.getKey().toStringUtf8(),
                 request.getMode()
         );
+    }
+
+    private void addClientCommandCallback(Command command, StreamObserver<?> responseObserver) {
+        commandStreamObserverMap.put(command, responseObserver);
     }
 }

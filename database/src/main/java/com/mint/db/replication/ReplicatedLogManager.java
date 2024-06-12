@@ -28,7 +28,7 @@ public interface ReplicatedLogManager<D> {
      * Reads log entry at the specified index, return `null` if the entry is not present.
      */
     default LogEntry<D> readLog(long index) {
-        List<LogEntry<D>> logEntries = readLog(index, index + 1);
+        List<LogEntry<D>> logEntries = readLog(index - 1, index);
         return !logEntries.isEmpty() ? logEntries.getFirst() : null;
     }
 

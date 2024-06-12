@@ -2,12 +2,8 @@ package com.mint.db;
 
 import com.google.inject.Guice;
 import com.google.inject.Injector;
-import com.mint.db.config.ConfigParser;
 import com.mint.db.config.InjectionModule;
-import com.mint.db.config.NodeConfig;
 import com.mint.db.grpc.server.Server;
-
-import java.io.FileNotFoundException;
 
 public class MintKVDatabase {
 

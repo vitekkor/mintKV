@@ -3,9 +3,11 @@ package com.mint.db.grpc.server;
 import com.google.inject.Inject;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.config.annotations.ExternalGrpcActorBean;
+import com.mint.db.config.annotations.InternalGrpcActorBean;
 import com.mint.db.config.annotations.NodeConfiguration;
 import com.mint.db.config.annotations.RaftActorBean;
 import com.mint.db.exceptions.ServerStartupException;
+import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.raft.RaftActorInterface;
 import io.grpc.ServerBuilder;
 import org.slf4j.Logger;
@@ -22,12 +24,13 @@ public class Server {
     public Server(
             @NodeConfiguration NodeConfig config,
             @RaftActorBean RaftActorInterface raftActor,
+            @InternalGrpcActorBean InternalGrpcActorInterface internalGrpcActor,
             @ExternalGrpcActorBean ExternalServiceImpl externalService
     ) {
         this.grpcServer = ServerBuilder
                 .forPort(config.getPort())
                 .addService(externalService)
-                .addService(new InternalServiceImpl(raftActor))
+                .addService(new InternalServiceImpl(raftActor, internalGrpcActor))
                 .build();
     }
 

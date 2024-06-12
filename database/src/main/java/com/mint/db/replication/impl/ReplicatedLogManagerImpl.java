@@ -1,6 +1,9 @@
 package com.mint.db.replication.impl;
 
 import com.mint.db.config.NodeConfig;
+import com.mint.db.dao.Dao;
+import com.mint.db.dao.Entry;
+import com.mint.db.dao.impl.BaseDao;
 import com.mint.db.dao.impl.BaseEntry;
 import com.mint.db.dao.impl.StringDaoWrapper;
 import com.mint.db.raft.model.LogId;
@@ -28,6 +31,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 
@@ -35,7 +39,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private static final Logger log = LoggerFactory.getLogger(ReplicatedLogManagerImpl.class);
     private static final int BLOB_BUFFER_SIZE = 512;
     private static final int BUFFER_SIZE = 64 * 1024;
-    private final StringDaoWrapper dao;
+    private final Dao<MemorySegment, Entry<MemorySegment>> dao;
     private final NodeConfig nodeConfig;
     private final ByteArraySegment longBuffer = new ByteArraySegment(Long.BYTES);
     private final ByteArraySegment blobBuffer = new ByteArraySegment(BLOB_BUFFER_SIZE);
@@ -54,7 +58,11 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private MemorySegment indexOutputMemorySegment;
     private LogId lastLogId = new LogId(0, 0);
 
-    public ReplicatedLogManagerImpl(NodeConfig nodeConfig, PersistentState state, StringDaoWrapper dao) {
+    public ReplicatedLogManagerImpl(
+            NodeConfig nodeConfig,
+            PersistentState state,
+            Dao<MemorySegment, Entry<MemorySegment>> dao
+    ) {
         this.dao = dao;
         this.nodeConfig = nodeConfig;
         this.state = state;
@@ -70,12 +78,14 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
             MemorySegment committedValue,
             MemorySegment uncommittedValue,
             long index,
-            long term
+            long term,
+            int processId
     ) {
         return new BaseLogEntry<>(
                 operationType,
                 new BaseEntry<>(key, committedValue, uncommittedValue, uncommittedValue != null),
-                new LogId(index, term)
+                new LogId(index, term),
+                processId
         );
     }
 
@@ -93,6 +103,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         }
         size += Long.BYTES; // log index
         size += Long.BYTES; // log term
+        size += Long.BYTES; // processId
         return size;
     }
 
@@ -205,8 +216,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
                     null,
                     false
             );
-            var baseEntryString = StringDaoWrapper.toBaseEntryString(newEntry);
-            dao.upsert(baseEntryString);
+            dao.upsert(newEntry);
         }
     }
 
@@ -218,6 +228,9 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     @Override
     public List<LogEntry<MemorySegment>> readLog(long fromIndex, long toIndex) {
         updateIndexMemorySegment();
+        if (fromIndex < 0) {
+            return Collections.emptyList();
+        }
         long offset = indexOutputMemorySegment.get(
                 ValueLayout.OfByte.JAVA_LONG_UNALIGNED,
                 fromIndex * Long.BYTES
@@ -264,6 +277,8 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
                 offset += Long.BYTES;
                 long term = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
                 offset += Long.BYTES;
+                long processId = logOutputMemorySegment.get(ValueLayout.OfByte.JAVA_LONG_UNALIGNED, offset);
+                offset += Long.BYTES;
                 logEntries.add(
                         createLogEntry(
                                 OperationType.fromLong(operationType),
@@ -271,7 +286,9 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
                                 committedValue,
                                 uncommittedValue,
                                 index,
-                                term)
+                                term,
+                                (int) processId
+                        )
                 );
             }
         } catch (IOException e) {
@@ -310,6 +327,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         }
         writeLong(logEntry.logId().index(), logOutputStream);
         writeLong(logEntry.logId().term(), logOutputStream);
+        writeLong(logEntry.processId(), logOutputStream);
     }
 
     private void writeLong(final long value, final OutputStream os) throws IOException {

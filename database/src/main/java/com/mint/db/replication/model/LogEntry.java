@@ -12,6 +12,8 @@ public interface LogEntry<D> {
 
     LogId logId();
 
+    int processId();
+
     /**
      * Converts entry to {@link Command} interface.
      *

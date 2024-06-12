@@ -29,9 +29,4 @@ public record BaseEntry<D>(
                 + ", uncommittedValueIsNotNull=" + uncommittedValueIsNotNull
                 + '}';
     }
-
-    @Override
-    public int processId() {
-        return 0;
-    }
 }

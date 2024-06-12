@@ -9,7 +9,7 @@ package com.mint.db.raft.model;
  * @param uncommitted true if client don't worry about replication
  */
 public record InsertCommand(
-        long processId,
+        int processId,
         String key,
         String value,
         boolean uncommitted

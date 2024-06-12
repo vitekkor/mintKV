@@ -10,7 +10,7 @@ import com.mint.DatabaseServiceOuterClass;
  * @param readMode  READ_COMMITTED (from state machine), READ_LOCAL (from log) or READ_CONSENSUS (replicate reading)
  */
 public record GetCommand(
-        long processId,
+        int processId,
         String key,
         DatabaseServiceOuterClass.ReadMode readMode
 ) implements Command {
