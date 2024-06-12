@@ -8,7 +8,7 @@ import com.mint.db.config.annotations.NodeConfiguration;
 import com.mint.db.config.annotations.RaftActorBean;
 import com.mint.db.exceptions.ServerStartupException;
 import com.mint.db.grpc.InternalGrpcActorInterface;
-import com.mint.db.raft.RaftActorInterface;
+import com.mint.db.raft.RaftActor;
 import io.grpc.ServerBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +23,7 @@ public class Server {
     @Inject
     public Server(
             @NodeConfiguration NodeConfig config,
-            @RaftActorBean RaftActorInterface raftActor,
+            @RaftActorBean RaftActor raftActor,
             @InternalGrpcActorBean InternalGrpcActorInterface internalGrpcActor,
             @ExternalGrpcActorBean ExternalServiceImpl externalService
     ) {

@@ -28,7 +28,11 @@ public class InternalServiceImpl extends RaftServiceGrpc.RaftServiceImplBase {
             Raft.VoteRequest request,
             StreamObserver<Raft.VoteResponse> responseObserver
     ) {
-        raftActor.onRequestVote(request, (responseObserver::onNext));
+        try {
+            raftActor.onRequestVote(request, responseObserver::onNext);
+        } finally {
+            responseObserver.onCompleted();
+        }
     }
 
     @Override
@@ -36,7 +40,11 @@ public class InternalServiceImpl extends RaftServiceGrpc.RaftServiceImplBase {
             Raft.AppendEntriesRequest request,
             StreamObserver<Raft.AppendEntriesResponse> responseObserver
     ) {
-        raftActor.onAppendEntry(request, responseObserver::onNext);
+        try {
+            raftActor.onAppendEntry(request, responseObserver::onNext);
+        } finally {
+            responseObserver.onCompleted();
+        }
     }
 
     @Override
@@ -47,6 +55,7 @@ public class InternalServiceImpl extends RaftServiceGrpc.RaftServiceImplBase {
         var command = clientCommandRequestRPCToCommand(request);
         raftActor.onClientCommand(command);
         internalGrpcActor.addClientCommandCallback(command, responseObserver);
+        //onCompleted will be called by the callback mechanism when the command is fully processed
     }
 
     private Command clientCommandRequestRPCToCommand(Raft.ClientCommandRequestRPC request) {

@@ -25,7 +25,7 @@ public class ExternalServiceImpl
         implements ExternalGrpcActorInterface {
 
     private static final Logger logger = LoggerFactory.getLogger(ExternalServiceImpl.class);
-    private final RaftActor raftActor;
+    private RaftActor raftActor;
     private final NodeConfig nodeConfig;
     private final CallbackKeeper callbackKeeper;
 

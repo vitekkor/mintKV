@@ -2,17 +2,7 @@ package com.mint.db.config;
 
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
-import com.mint.db.config.annotations.CallbackKeeperBean;
-import com.mint.db.config.annotations.DaoBean;
-import com.mint.db.config.annotations.EnvironmentBean;
-import com.mint.db.config.annotations.ExternalGrpcActorBean;
-import com.mint.db.config.annotations.InternalClientsBean;
-import com.mint.db.config.annotations.InternalGrpcActorBean;
-import com.mint.db.config.annotations.NodeConfiguration;
-import com.mint.db.config.annotations.PersistentStateBean;
-import com.mint.db.config.annotations.RaftActorBean;
-import com.mint.db.config.annotations.ReplicatedLogManagerBean;
-import com.mint.db.config.annotations.StateMachineBean;
+import com.mint.db.config.annotations.*;
 import com.mint.db.dao.Dao;
 import com.mint.db.dao.Entry;
 import com.mint.db.dao.impl.BaseDao;
@@ -21,15 +11,11 @@ import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.grpc.client.InternalGrpcClient;
 import com.mint.db.grpc.server.ExternalServiceImpl;
 import com.mint.db.http.server.CallbackKeeper;
-import com.mint.db.raft.DaoStateMachine;
-import com.mint.db.raft.Environment;
-import com.mint.db.raft.EnvironmentImpl;
-import com.mint.db.raft.RaftActor;
-import com.mint.db.raft.RaftActorInterface;
-import com.mint.db.raft.StateMachine;
+import com.mint.db.raft.*;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.impl.ReplicatedLogManagerImpl;
 import com.mint.db.replication.model.PersistentState;
+import jakarta.inject.Singleton;
 
 import java.io.FileNotFoundException;
 import java.lang.foreign.MemorySegment;
@@ -110,7 +96,8 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @RaftActorBean
-    static RaftActorInterface provideRaftActorInterface(
+    @Singleton
+    static RaftActor provideRaftActorInterface(
             @InternalGrpcActorBean InternalGrpcActorInterface internalGrpcActor,
             @EnvironmentBean Environment<MemorySegment> environment,
             @CallbackKeeperBean CallbackKeeper callbackKeeper
@@ -120,6 +107,7 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @InternalClientsBean
+    @Singleton
     static Map<Integer, InternalGrpcClient> provideInternalGrpcClients(@NodeConfiguration NodeConfig nodeConfig) {
         Map<Integer, InternalGrpcClient> internalGrpcClients = new HashMap<>();
         for (int nodeId = 0; nodeId < nodeConfig.getCluster().size(); nodeId++) {
