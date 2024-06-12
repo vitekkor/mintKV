@@ -4,8 +4,11 @@ import com.google.protobuf.ByteString;
 import com.mint.DatabaseServiceGrpc;
 import com.mint.DatabaseServiceOuterClass;
 import com.mint.db.config.NodeConfig;
+import com.mint.db.config.annotations.CallbackKeeperBean;
 import com.mint.db.config.annotations.NodeConfiguration;
+import com.mint.db.config.annotations.RaftActorBean;
 import com.mint.db.grpc.ExternalGrpcActorInterface;
+import com.mint.db.http.server.CallbackKeeper;
 import com.mint.db.raft.RaftActor;
 import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
@@ -17,27 +20,23 @@ import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 public class ExternalServiceImpl
         extends DatabaseServiceGrpc.DatabaseServiceImplBase
         implements ExternalGrpcActorInterface {
 
     private static final Logger logger = LoggerFactory.getLogger(ExternalServiceImpl.class);
-    private final Map<Command, StreamObserver<?>> commandStreamObserverMap = new ConcurrentHashMap<>();
+    private final RaftActor raftActor;
     private final NodeConfig nodeConfig;
-    private RaftActor raftActor;
+    private final CallbackKeeper callbackKeeper;
 
     public ExternalServiceImpl(
-            @NodeConfiguration NodeConfig nodeConfig
+            @NodeConfiguration NodeConfig nodeConfig,
+            @RaftActorBean RaftActor raftActor,
+            @CallbackKeeperBean CallbackKeeper callbackKeeper
     ) {
         this.nodeConfig = nodeConfig;
-    }
-
-    @Override
-    public void setRaftActor(RaftActor raftActor) {
         this.raftActor = raftActor;
+        this.callbackKeeper = callbackKeeper;
     }
 
     @Override
@@ -74,8 +73,9 @@ public class ExternalServiceImpl
     }
 
     @Override
-    public void onClientCommandResult(Command command, CommandResult commandResult) {
-        StreamObserver<?> responseObserver = commandStreamObserverMap.remove(command);
+    public void onClientCommandResult(
+            Command command, CommandResult commandResult, StreamObserver<?> responseObserver
+    ) {
         if (responseObserver == null) {
             logger.warn("No response observer found for command: {}", command);
             return;
@@ -133,6 +133,8 @@ public class ExternalServiceImpl
     }
 
     private void addClientCommandCallback(Command command, StreamObserver<?> responseObserver) {
-        commandStreamObserverMap.put(command, responseObserver);
+        callbackKeeper.addClientCommandCallback(command, (c, r) -> {
+            onClientCommandResult(c, r, responseObserver);
+        });
     }
 }
