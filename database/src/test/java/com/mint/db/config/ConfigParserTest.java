@@ -13,7 +13,7 @@ class ConfigParserTest {
 
     @Test
     void testParseConfig_DefaultPath() throws FileNotFoundException {
-        NodeConfig expectedConfig = new NodeConfig(8080, 1, "logs/", 200L, Arrays.asList("node1", "node2"));
+        NodeConfig expectedConfig = new NodeConfig(9090, 8080, 1, "logs/", 200L, Arrays.asList("node1", "node2"));
 
         NodeConfig actualConfig = ConfigParser.parseConfig();
 
@@ -30,6 +30,7 @@ class ConfigParserTest {
 
         try {
             NodeConfig expectedConfig = new NodeConfig(
+                    9090,
                     8800,
                     11,
                     "/var/logs2",
