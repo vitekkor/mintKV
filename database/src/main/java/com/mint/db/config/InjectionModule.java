@@ -60,10 +60,9 @@ public class InjectionModule extends AbstractModule {
     @Provides
     @ExternalGrpcActorBean
     static ExternalServiceImpl provideExternalGrpcActorInterface(
-            @NodeConfiguration NodeConfig nodeConfig,
-            @RaftActorBean RaftActor raftActor
+            @NodeConfiguration NodeConfig nodeConfig
     ) {
-        return new ExternalServiceImpl(nodeConfig, raftActor);
+        return new ExternalServiceImpl(nodeConfig);
     }
 
     @Provides
@@ -107,7 +106,9 @@ public class InjectionModule extends AbstractModule {
             @EnvironmentBean Environment<MemorySegment> environment,
             @ExternalGrpcActorBean ExternalGrpcActorInterface externalGrpcActor
     ) {
-        return new RaftActor(internalGrpcActor, environment, externalGrpcActor);
+        var raftActor = new RaftActor(internalGrpcActor, environment, externalGrpcActor);
+        externalGrpcActor.setRaftActor(raftActor);
+        return raftActor;
     }
 
     @Provides

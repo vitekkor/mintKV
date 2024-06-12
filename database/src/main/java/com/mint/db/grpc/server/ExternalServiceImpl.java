@@ -5,7 +5,6 @@ import com.mint.DatabaseServiceGrpc;
 import com.mint.DatabaseServiceOuterClass;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.config.annotations.NodeConfiguration;
-import com.mint.db.config.annotations.RaftActorBean;
 import com.mint.db.grpc.ExternalGrpcActorInterface;
 import com.mint.db.raft.RaftActor;
 import com.mint.db.raft.model.Command;
@@ -27,14 +26,17 @@ public class ExternalServiceImpl
 
     private static final Logger logger = LoggerFactory.getLogger(ExternalServiceImpl.class);
     private final Map<Command, StreamObserver<?>> commandStreamObserverMap = new ConcurrentHashMap<>();
-    private final RaftActor raftActor;
     private final NodeConfig nodeConfig;
+    private RaftActor raftActor;
 
     public ExternalServiceImpl(
-            @NodeConfiguration NodeConfig nodeConfig,
-            @RaftActorBean RaftActor raftActor
+            @NodeConfiguration NodeConfig nodeConfig
     ) {
         this.nodeConfig = nodeConfig;
+    }
+
+    @Override
+    public void setRaftActor(RaftActor raftActor) {
         this.raftActor = raftActor;
     }
 
