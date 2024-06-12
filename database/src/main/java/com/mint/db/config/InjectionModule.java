@@ -9,7 +9,6 @@ import com.mint.db.config.annotations.InternalGrpcActorBean;
 import com.mint.db.config.annotations.NodeConfiguration;
 import com.mint.db.config.annotations.PersistentStateBean;
 import com.mint.db.config.annotations.RaftActorBean;
-import com.mint.db.grpc.ExternalGrpcActorInterface;
 import com.mint.db.grpc.InternalGrpcActor;
 import com.mint.db.grpc.InternalGrpcActorInterface;
 import com.mint.db.grpc.client.ExternalGrpcClient;
@@ -48,10 +47,9 @@ public class InjectionModule extends AbstractModule {
     @Provides
     @ExternalGrpcActorBean
     static ExternalServiceImpl provideExternalGrpcActorInterface(
-            @NodeConfiguration NodeConfig nodeConfig,
-            @RaftActorBean RaftActor raftActor
+            @NodeConfiguration NodeConfig nodeConfig
     ) {
-        return new ExternalServiceImpl(nodeConfig, raftActor);
+        return new ExternalServiceImpl(nodeConfig);
     }
 
 
@@ -61,10 +59,12 @@ public class InjectionModule extends AbstractModule {
             @InternalGrpcActorBean InternalGrpcActorInterface internalGrpcActor,
             @NodeConfiguration NodeConfig nodeConfig,
             @PersistentStateBean PersistentState persistentState,
-            @ExternalGrpcActorBean ExternalGrpcActorInterface externalGrpcActor
+            @ExternalGrpcActorBean ExternalServiceImpl externalGrpcActor
 
     ) {
-        return new RaftActor(internalGrpcActor, nodeConfig, persistentState, externalGrpcActor);
+        var raftActor = new RaftActor(internalGrpcActor, nodeConfig, persistentState, externalGrpcActor);
+        externalGrpcActor.setRaftActor(raftActor);
+        return raftActor;
     }
 
     @Provides
