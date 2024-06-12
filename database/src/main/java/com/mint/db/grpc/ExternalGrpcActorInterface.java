@@ -1,5 +1,6 @@
 package com.mint.db.grpc;
 
+import com.mint.db.raft.RaftActor;
 import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
 import io.grpc.stub.StreamObserver;
@@ -14,5 +15,9 @@ public interface ExternalGrpcActorInterface {
             Command command,
             CommandResult commandResult,
             StreamObserver<?> responseObserver
+    );
+
+    void setRaftActor(
+            RaftActor raftActor
     );
 }
