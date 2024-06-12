@@ -16,8 +16,4 @@ public interface ExternalGrpcActorInterface {
             CommandResult commandResult,
             StreamObserver<?> responseObserver
     );
-
-    void setRaftActor(
-            RaftActor raftActor
-    );
 }
