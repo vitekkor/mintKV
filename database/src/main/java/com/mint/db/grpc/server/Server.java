@@ -58,6 +58,12 @@ public class Server {
         grpcServer.shutdown().awaitTermination(30, TimeUnit.SECONDS);
     }
 
+    public void forceStop() throws InterruptedException {
+        grpcServer.shutdown();
+        grpcServer.awaitTermination(5, TimeUnit.SECONDS);
+        grpcServer.shutdownNow();
+    }
+
     /**
      * Await termination on the main thread since the grpc library uses daemon threads.
      */

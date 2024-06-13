@@ -34,4 +34,17 @@ public class BaseDao implements Dao<MemorySegment, Entry<MemorySegment>> {
     public Entry<MemorySegment> upsert(Entry<MemorySegment> entry) {
         return delegate.put(entry.key(), entry);
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof BaseDao baseDao)) return false;
+
+        return delegate.equals(baseDao.delegate);
+    }
+
+    @Override
+    public int hashCode() {
+        return delegate.hashCode();
+    }
 }

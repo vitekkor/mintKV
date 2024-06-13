@@ -3,9 +3,7 @@ package com.mint.db.replication.impl;
 import com.mint.db.config.NodeConfig;
 import com.mint.db.dao.Dao;
 import com.mint.db.dao.Entry;
-import com.mint.db.dao.impl.BaseDao;
 import com.mint.db.dao.impl.BaseEntry;
-import com.mint.db.dao.impl.StringDaoWrapper;
 import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.ReplicatedLogManager;
 import com.mint.db.replication.model.LogEntry;
@@ -16,7 +14,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedOutputStream;
-import java.io.Closeable;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -35,7 +32,7 @@ import java.util.Collections;
 import java.util.List;
 
 
-public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegment>, Closeable {
+public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegment> {
     private static final Logger log = LoggerFactory.getLogger(ReplicatedLogManagerImpl.class);
     private static final int BLOB_BUFFER_SIZE = 512;
     private static final int BUFFER_SIZE = 64 * 1024;
@@ -43,7 +40,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private final NodeConfig nodeConfig;
     private final ByteArraySegment longBuffer = new ByteArraySegment(Long.BYTES);
     private final ByteArraySegment blobBuffer = new ByteArraySegment(BLOB_BUFFER_SIZE);
-    private long commitIndex = 0; // todo read from file
+    private volatile long commitIndex = 0; // todo read from file
     private Arena arena;
     private Path logFile;
     private Path indexFile;
@@ -83,7 +80,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     ) {
         return new BaseLogEntry<>(
                 operationType,
-                new BaseEntry<>(key, committedValue, uncommittedValue, uncommittedValue != null),
+                new BaseEntry(key, committedValue, uncommittedValue, uncommittedValue != null),
                 new LogId(index, term),
                 processId
         );
@@ -210,7 +207,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
 
     private void rollbackEntries(List<LogEntry<MemorySegment>> oldEntries) {
         for (LogEntry<MemorySegment> oldEntry : oldEntries.reversed()) {
-            var newEntry = new BaseEntry<>(
+            var newEntry = new BaseEntry(
                     oldEntry.entry().key(),
                     oldEntry.entry().committedValue(),
                     null,
@@ -229,6 +226,9 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     public List<LogEntry<MemorySegment>> readLog(long fromIndex, long toIndex) {
         updateIndexMemorySegment();
         if (fromIndex < 0) {
+            return Collections.emptyList();
+        }
+        if (indexOutputMemorySegment.byteSize() == 0) {
             return Collections.emptyList();
         }
         long offset = indexOutputMemorySegment.get(
@@ -457,7 +457,9 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
             closeOutputStreams();
             logOutputFileChannel.close();
             indexOutputFileChannel.close();
-            arena.close();
+            if (arena.scope().isAlive()) {
+                arena.close();
+            }
         } catch (IOException e) {
             throw new RuntimeException("Failed to close log file or index file", e);
         }

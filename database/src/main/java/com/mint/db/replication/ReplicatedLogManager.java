@@ -4,9 +4,10 @@ import com.mint.db.raft.model.LogId;
 import com.mint.db.replication.model.LogEntry;
 import com.mint.db.replication.model.PersistentState;
 
+import java.io.Closeable;
 import java.util.List;
 
-public interface ReplicatedLogManager<D> {
+public interface ReplicatedLogManager<D> extends Closeable {
     /**
      * Reads {@link PersistentState} of the Raft algorithm.
      */

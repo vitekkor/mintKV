@@ -7,6 +7,12 @@ public class MemorySegmentComparator {
     private MemorySegmentComparator() {
     }
 
+    public static boolean equals(MemorySegment o1, MemorySegment o2) {
+        if (o1 == o2) return true;
+        if (o1 == null || o2 == null) return false;
+        return compare(o1, o2) == 0;
+    }
+
     public static int compare(MemorySegment o1, MemorySegment o2) {
         return compareWithOffsets(o1, 0, o1.byteSize(), o2, 0, o2.byteSize());
     }

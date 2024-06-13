@@ -19,12 +19,12 @@ public record BaseLogEntry<D>(
         LogId logId,
         int processId
 ) implements LogEntry<D> {
-    public static BaseLogEntry<MemorySegment> valueOf(Raft.LogEntry entry, int processId) {
+    public static BaseLogEntry<MemorySegment> valueOf(Raft.LogEntry entry) {
         return new BaseLogEntry<>(
                 OperationType.valueOf(entry.getOperation().name()),
                 BaseEntry.valueOf(entry),
                 new LogId(entry.getIndex(), entry.getTerm()),
-                processId
+                entry.getProcessId()
         );
     }
 

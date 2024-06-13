@@ -2,6 +2,7 @@ package com.mint.db.grpc;
 
 import com.google.protobuf.ByteString;
 import com.mint.db.Raft;
+import com.mint.db.config.annotations.InternalClientsBean;
 import com.mint.db.grpc.client.InternalGrpcClient;
 import com.mint.db.raft.model.Command;
 import com.mint.db.raft.model.CommandResult;
@@ -10,10 +11,16 @@ import com.mint.db.raft.model.GetCommandResult;
 import com.mint.db.raft.model.InsertCommand;
 import com.mint.db.raft.model.InsertCommandResult;
 import com.mint.db.util.ClientCommandResultConsumer;
+import com.mint.db.util.LogUtil;
 import io.grpc.stub.StreamObserver;
+import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
@@ -22,13 +29,14 @@ import static com.mint.db.Raft.Operation.DELETE;
 import static com.mint.db.Raft.Operation.GET;
 import static com.mint.db.Raft.Operation.PUT;
 
-public class InternalGrpcActor implements InternalGrpcActorInterface {
+public class InternalGrpcActor implements InternalGrpcActorInterface, Closeable {
     private static final Logger logger = LoggerFactory.getLogger(InternalGrpcActor.class);
 
     private final Map<Integer, InternalGrpcClient> internalGrpcClients;
     private final Map<Command, StreamObserver<?>> commandStreamObserverMap = new ConcurrentHashMap<>();
 
-    public InternalGrpcActor(Map<Integer, InternalGrpcClient> internalGrpcClients) {
+    @Inject
+    public InternalGrpcActor(@InternalClientsBean Map<Integer, InternalGrpcClient> internalGrpcClients) {
         this.internalGrpcClients = internalGrpcClients;
     }
 
@@ -41,7 +49,7 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
             int nodeId = entry.getKey();
             InternalGrpcClient client = entry.getValue();
             client.requestVote(voteRequest, response -> {
-                logger.debug("VoteResponse from node {}: {}", nodeId, response);
+                logger.debug("VoteResponse from node {}: {}", nodeId, LogUtil.protobufMessageToString(response));
                 onRequestVoteResult.accept(nodeId, response);
             });
         }
@@ -56,7 +64,7 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
             int nodeId = entry.getKey();
             InternalGrpcClient client = entry.getValue();
             client.appendEntries(appendEntriesRequest, response -> {
-                logger.debug("AppendEntriesResponse from node {}: {}", nodeId, response);
+                logger.debug("AppendEntriesResponse from node {}: {}", nodeId, LogUtil.protobufMessageToString(response));
                 onAppendEntryResult.accept(nodeId, response);
             });
         }
@@ -72,7 +80,7 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
 
         if (client != null) {
             client.appendEntries(appendEntriesRequest, response -> {
-                logger.debug("AppendEntriesResponse from node {}: {}", destId, response);
+                logger.debug("AppendEntriesResponse from node {}: {}", destId, LogUtil.protobufMessageToString(response));
                 onAppendEntryResult.accept(destId, response);
             });
         } else {
@@ -173,7 +181,9 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
 
     @Override
     public void addClientCommandCallback(Command command, StreamObserver<?> responseObserver) {
+        logger.debug("Add callback to command {}", command);
         commandStreamObserverMap.put(command, responseObserver);
+        System.out.println();
     }
 
     @Override
@@ -194,5 +204,24 @@ public class InternalGrpcActor implements InternalGrpcActorInterface {
         ((StreamObserver<Raft.ClientCommandResponseRPC>) responseObserver).onNext(response);
         responseObserver.onCompleted();
         logger.debug("Command result processed for command: {}", command);
+    }
+
+    @Override
+    public void close() throws IOException {
+        List<Exception> exceptions = new ArrayList<>();
+        internalGrpcClients.forEach((_, client) -> {
+            try {
+                client.close();
+            } catch (IOException e) {
+                exceptions.add(e);
+            }
+        });
+        if (!exceptions.isEmpty()) {
+            var exception = new RuntimeException();
+            for (Exception e : exceptions) {
+                exception.addSuppressed(e);
+            }
+            throw exception;
+        }
     }
 }
