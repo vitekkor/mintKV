@@ -1,7 +1,7 @@
 package com.mint.db.dao.util;
 
 import com.mint.db.dao.Entry;
-import com.mint.db.dao.impl.BaseEntry;
+import com.mint.db.dao.impl.StringEntry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.opentest4j.AssertionFailedError;
@@ -96,7 +96,7 @@ public class BaseTest {
 
     public Entry<String> entry(String key, String committedValue) {
         checkInterrupted();
-        return new BaseEntry<>(key, committedValue, null, false);
+        return new StringEntry(key, committedValue, null, false);
     }
 
     public List<Entry<String>> entries(int count) {
@@ -112,7 +112,7 @@ public class BaseTest {
                     throw new IndexOutOfBoundsException("Index is " + index + ", size is " + count);
                 }
                 String paddedIdx = String.format("%010d", index);
-                return new BaseEntry<>(keyPrefix + paddedIdx, valuePrefix + paddedIdx, null, false);
+                return new StringEntry(keyPrefix + paddedIdx, valuePrefix + paddedIdx, null, false);
             }
 
             @Override
@@ -123,7 +123,7 @@ public class BaseTest {
     }
 
     public Entry<String> entryAt(int index) {
-        return new BaseEntry<>(keyAt(index), valueAt(index), null, false);
+        return new StringEntry(keyAt(index), valueAt(index), null, false);
     }
 
     public String keyAt(int index) {
