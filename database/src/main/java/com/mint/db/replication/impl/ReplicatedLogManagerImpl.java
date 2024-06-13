@@ -30,6 +30,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 
 public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegment> {
@@ -41,19 +42,19 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     private final ByteArraySegment longBuffer = new ByteArraySegment(Long.BYTES);
     private final ByteArraySegment blobBuffer = new ByteArraySegment(BLOB_BUFFER_SIZE);
     private volatile long commitIndex = 0; // todo read from file
-    private Arena arena;
+    private volatile Arena arena;
     private Path logFile;
     private Path indexFile;
-    private PersistentState state;
-    private long lastLogOffset = 0;
-    private long lastAppliedIndex = 0;
-    private OutputStream logOutputStream;
-    private OutputStream indexOutputStream;
+    private volatile PersistentState state;
+    private final AtomicLong lastLogOffset = new AtomicLong();
+    private volatile long lastAppliedIndex = 0;
+    private volatile OutputStream logOutputStream;
+    private volatile OutputStream indexOutputStream;
     private FileChannel logOutputFileChannel;
     private FileChannel indexOutputFileChannel;
-    private MemorySegment logOutputMemorySegment;
-    private MemorySegment indexOutputMemorySegment;
-    private LogId lastLogId = new LogId(0, 0);
+    private volatile MemorySegment logOutputMemorySegment;
+    private volatile MemorySegment indexOutputMemorySegment;
+    private volatile LogId lastLogId = new LogId(0, 0);
 
     public ReplicatedLogManagerImpl(
             NodeConfig nodeConfig,
@@ -172,9 +173,10 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         try {
             serializeLogEntry(logEntry);
             logOutputStream.flush();
-            writeLong(lastLogOffset, indexOutputStream);
+            var entrySize = calculateLogEntrySize(logEntry);
+            long entryOffset = lastLogOffset.getAndAdd(entrySize);
+            writeLong(entryOffset, indexOutputStream);
             indexOutputStream.flush();
-            lastLogOffset += calculateLogEntrySize(logEntry);
             lastLogId = logEntry.logId();
             lastAppliedIndex = logEntry.logId().index();
             log.info("Appended log entry: {}", logEntry);
@@ -185,6 +187,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
 
     private void rollbackLog(long index) {
         try {
+            log.debug("Rollback log from {}", index);
             closeOutputStreams();
             updateIndexMemorySegment();
             long offset = indexOutputMemorySegment.get(
@@ -195,7 +198,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
             arena.close();
             logOutputFileChannel.truncate(offset);
             indexOutputFileChannel.truncate(index * Long.BYTES);
-            lastLogOffset = offset;
+            lastLogOffset.set(offset);
             lastAppliedIndex = index;
             initializeMemorySegments();
         } catch (IOException e) {
@@ -213,7 +216,7 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
                     null,
                     false
             );
-            dao.upsert(newEntry);
+            dao.remove(newEntry);
         }
     }
 
@@ -228,7 +231,8 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
         if (fromIndex < 0) {
             return Collections.emptyList();
         }
-        if (indexOutputMemorySegment.byteSize() == 0) {
+        var indexOffset = fromIndex * Long.BYTES;
+        if (indexOutputMemorySegment.byteSize() <= indexOffset) {
             return Collections.emptyList();
         }
         long offset = indexOutputMemorySegment.get(
@@ -307,6 +311,11 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     public void setCommitIndex(long commitIndex) {
         // todo write to file
         this.commitIndex = commitIndex;
+    }
+
+    @Override
+    public long lastAppliedIndex() {
+        return lastAppliedIndex;
     }
 
     private void serializeLogEntry(LogEntry<MemorySegment> logEntry) throws IOException {
@@ -399,15 +408,15 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
             long lastLogOffset = Files.size(logFile);
             long lastLogIndex = Files.size(indexFile) / Long.BYTES;
             if (lastLogIndex > 0) {
-                lastLogOffset = indexOutputMemorySegment.get(
+                long lastEntryOffset = indexOutputMemorySegment.get(
                         ValueLayout.OfByte.JAVA_LONG_UNALIGNED,
                         (lastLogIndex - 1) * Long.BYTES
                 );
-                var lastEntry = deserializeLogEntries(lastLogOffset, 1, false).getLast();
+                var lastEntry = deserializeLogEntries(lastEntryOffset, 1, false).getLast();
                 this.lastLogId = lastEntry.logId();
                 this.lastAppliedIndex = lastEntry.logId().index();
             }
-            this.lastLogOffset = lastLogOffset;
+            this.lastLogOffset.set(lastLogOffset);
         } catch (IOException e) {
             throw new RuntimeException("Failed to read index file", e);
         }
@@ -455,6 +464,10 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
     public void close() {
         try {
             closeOutputStreams();
+            if (arena.scope().isAlive()) {
+                logOutputMemorySegment.force();
+                indexOutputMemorySegment.force();
+            }
             logOutputFileChannel.close();
             indexOutputFileChannel.close();
             if (arena.scope().isAlive()) {
@@ -467,7 +480,10 @@ public class ReplicatedLogManagerImpl implements ReplicatedLogManager<MemorySegm
 
     private void closeOutputStreams() {
         try {
+            logOutputStream.flush();
             logOutputStream.close();
+
+            indexOutputStream.flush();
             indexOutputStream.close();
         } catch (IOException e) {
             throw new RuntimeException("Failed to close log streams", e);

@@ -23,9 +23,9 @@ public record BaseEntry(
     @Override
     public String toString() {
         return "BaseEntry{"
-                + "key=" + key
-                + ", committedValue=" + committedValue
-                + ", uncommittedValue=" + uncommittedValue
+                + "key=" + StringDaoWrapper.toString(key)
+                + ", committedValue=" + StringDaoWrapper.toString(committedValue)
+                + ", uncommittedValue=" + StringDaoWrapper.toString(uncommittedValue)
                 + ", uncommittedValueIsNotNull=" + uncommittedValueIsNotNull
                 + '}';
     }

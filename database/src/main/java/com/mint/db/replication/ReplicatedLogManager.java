@@ -38,4 +38,6 @@ public interface ReplicatedLogManager<D> extends Closeable {
     long commitIndex();
 
     void setCommitIndex(long commitIndex);
+
+    long lastAppliedIndex();
 }

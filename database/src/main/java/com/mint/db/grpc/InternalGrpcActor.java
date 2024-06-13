@@ -60,6 +60,7 @@ public class InternalGrpcActor implements InternalGrpcActorInterface, Closeable 
             Raft.AppendEntriesRequest appendEntriesRequest,
             BiConsumer<Integer, Raft.AppendEntriesResponse> onAppendEntryResult
     ) {
+        logger.debug("Send appendEntriesRequest to all cluster {}", LogUtil.protobufMessageToString(appendEntriesRequest));
         for (Map.Entry<Integer, InternalGrpcClient> entry : internalGrpcClients.entrySet()) {
             int nodeId = entry.getKey();
             InternalGrpcClient client = entry.getValue();
@@ -183,7 +184,6 @@ public class InternalGrpcActor implements InternalGrpcActorInterface, Closeable 
     public void addClientCommandCallback(Command command, StreamObserver<?> responseObserver) {
         logger.debug("Add callback to command {}", command);
         commandStreamObserverMap.put(command, responseObserver);
-        System.out.println();
     }
 
     @Override

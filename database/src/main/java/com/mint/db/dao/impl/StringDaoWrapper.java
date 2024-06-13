@@ -64,6 +64,12 @@ public class StringDaoWrapper implements Dao<String, Entry<String>> {
         return oldEntry != null ? toBaseEntryString(oldEntry) : null;
     }
 
+    @Override
+    public void remove(Entry<String> entry) {
+        Entry<MemorySegment> delegateEntry = toBaseEntryMemorySegment(entry);
+        delegate.remove(delegateEntry);
+    }
+
     public static StringEntry toBaseEntryString(Entry<MemorySegment> entry) {
         return new StringEntry(
                 toString(entry.key()),

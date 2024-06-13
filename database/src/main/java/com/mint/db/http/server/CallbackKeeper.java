@@ -18,7 +18,6 @@ public class CallbackKeeper {
     public void addClientCommandCallback(Command command, BiConsumer<Command, CommandResult> callback) {
         logger.info("Add callback on command {}", command);
         commandBiConsumerConcurrentHashMap.put(command, callback);
-        System.out.println();
     }
 
     public void onClientCommandResult(Command command, CommandResult commandResult) {
@@ -30,5 +29,4 @@ public class CallbackKeeper {
             logger.warn("Callback on command {} is empty", command);
         }
     }
-
 }
