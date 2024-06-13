@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.BiConsumer;
 
 import static com.mint.db.Raft.Operation.DELETE;
@@ -33,7 +34,8 @@ public class InternalGrpcActor implements InternalGrpcActorInterface, Closeable 
     private static final Logger logger = LoggerFactory.getLogger(InternalGrpcActor.class);
 
     private final Map<Integer, InternalGrpcClient> internalGrpcClients;
-    private final Map<Command, StreamObserver<?>> commandStreamObserverMap = new ConcurrentHashMap<>();
+    private final Map<Command, ConcurrentLinkedQueue<StreamObserver<?>>> commandStreamObserverMap =
+            new ConcurrentHashMap<>();
 
     @Inject
     public InternalGrpcActor(@InternalClientsBean Map<Integer, InternalGrpcClient> internalGrpcClients) {
@@ -183,27 +185,35 @@ public class InternalGrpcActor implements InternalGrpcActorInterface, Closeable 
     @Override
     public void addClientCommandCallback(Command command, StreamObserver<?> responseObserver) {
         logger.debug("Add callback to command {}", command);
-        commandStreamObserverMap.put(command, responseObserver);
+        commandStreamObserverMap.compute(command, (k, v) -> {
+            ConcurrentLinkedQueue<StreamObserver<?>> queue =
+                    (v == null) ? new ConcurrentLinkedQueue<>() : v;
+            queue.add(responseObserver);
+            return queue;
+        });
     }
 
     @Override
     public void onClientCommandResult(Command command, CommandResult commandResult) {
-        StreamObserver<?> responseObserver = commandStreamObserverMap.remove(command);
-        if (responseObserver == null) {
-            logger.warn("No response observer found for command: {}", command);
-            return;
-        }
-        ByteString value = commandResult.value() != null
-                ? ByteString.copyFromUtf8(commandResult.value())
-                : ByteString.EMPTY;
-        Raft.ClientCommandResponseRPC response = Raft.ClientCommandResponseRPC.newBuilder()
-                .setTerm(commandResult.term())
-                .setKey(ByteString.copyFromUtf8(commandResult.key()))
-                .setValue(value)
-                .build();
-        ((StreamObserver<Raft.ClientCommandResponseRPC>) responseObserver).onNext(response);
-        responseObserver.onCompleted();
-        logger.debug("Command result processed for command: {}", command);
+        commandStreamObserverMap.computeIfPresent(command, (k, queue) -> {
+            StreamObserver<?> responseObserver = queue.poll();
+            if (responseObserver == null) {
+                logger.warn("No response observer found for command: {}", command);
+            } else {
+                ByteString value = commandResult.value() != null
+                        ? ByteString.copyFromUtf8(commandResult.value())
+                        : ByteString.EMPTY;
+                Raft.ClientCommandResponseRPC response = Raft.ClientCommandResponseRPC.newBuilder()
+                        .setTerm(commandResult.term())
+                        .setKey(ByteString.copyFromUtf8(commandResult.key()))
+                        .setValue(value)
+                        .build();
+                ((StreamObserver<Raft.ClientCommandResponseRPC>) responseObserver).onNext(response);
+                responseObserver.onCompleted();
+                logger.debug("Command result processed for command: {}", command);
+            }
+            return queue.isEmpty() ? null : queue;
+        });
     }
 
     @Override

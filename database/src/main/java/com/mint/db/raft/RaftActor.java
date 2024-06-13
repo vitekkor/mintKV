@@ -452,6 +452,7 @@ public class RaftActor implements RaftActorInterface {
         PersistentState state = env.replicatedLogManager().readPersistentState();
         // reject old term
         if (voteRequest.getTerm() < state.currentTerm()) {
+            logger.debug("Reject old term");
             Raft.VoteResponse voteResponse = Raft.VoteResponse.newBuilder()
                     .setTerm(state.currentTerm())
                     .setVoteGranted(false)
@@ -467,6 +468,7 @@ public class RaftActor implements RaftActorInterface {
 
         // reject new leader in the same term
         if (isAlreadyVotedForAnotherInCurrentTerm) {
+            logger.debug("Reject new leader in the same term");
             Raft.VoteResponse voteResponse = Raft.VoteResponse.newBuilder()
                     .setTerm(state.currentTerm())
                     .setVoteGranted(false)
@@ -475,9 +477,15 @@ public class RaftActor implements RaftActorInterface {
             return;
         }
 
+        LogId lastLogId = env.replicatedLogManager().readLastLogId();
+
+        boolean isLogUpToDate
+                = compareIdLogs(voteRequest.getLastLogTerm(), voteRequest.getLastLogIndex(), lastLogId) >= 0;
+
         votedForMe = 0;
-        leaderId = -1;
-        if (Objects.equals(state.votedFor(), voteRequest.getCandidateId())) {
+        if (Objects.equals(state.votedFor(), voteRequest.getCandidateId()) && isLogUpToDate) {
+            logger.debug("Vote for {}", voteRequest.getCandidateId());
+            leaderId = -1;
             if (state.currentTerm() < voteRequest.getTerm()) {
                 env.replicatedLogManager().writePersistentState(
                         new PersistentState(voteRequest.getTerm(), voteRequest.getCandidateId())
@@ -492,12 +500,8 @@ public class RaftActor implements RaftActorInterface {
             return;
         }
 
-        LogId lastLogId = env.replicatedLogManager().readLastLogId();
-
-        boolean isLogUpToDate
-                = compareIdLogs(voteRequest.getLastLogTerm(), voteRequest.getLastLogIndex(), lastLogId) >= 0;
-
         if (!isLogUpToDate) { // new term, but old log, so we reject vote request and update our term
+            logger.debug("New term, but old log, so we reject vote request and update our term");
             env.replicatedLogManager().writePersistentState(new PersistentState(voteRequest.getTerm()));
             Raft.VoteResponse voteResponse = Raft.VoteResponse.newBuilder()
                     .setTerm(voteRequest.getTerm())
@@ -508,6 +512,7 @@ public class RaftActor implements RaftActorInterface {
             return;
         }
 
+        logger.debug("Vote for {}", voteRequest.getCandidateId());
         env.replicatedLogManager().writePersistentState(
                 new PersistentState(voteRequest.getTerm(), voteRequest.getCandidateId())
         );
