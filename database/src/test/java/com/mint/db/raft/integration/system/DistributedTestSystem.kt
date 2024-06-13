@@ -1,8 +1,10 @@
 package com.mint.db.raft.integration.system
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.google.inject.Guice
 import com.google.inject.util.Modules
 import com.mint.db.config.InjectionModule
+import com.mint.db.config.NodeConfig
 import com.mint.db.grpc.server.Server
 import com.mint.db.raft.StateMachine
 import com.mint.db.raft.integration.configuration.Configuration
@@ -19,16 +21,18 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.lang.foreign.MemorySegment
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+
 
 data class SystemCommandResult(
     val processId: Int,
     val result: CommandResult
 )
 
-private const val AWAIT_TIMEOUT_MS = 5000
+private const val AWAIT_TIMEOUT_MS = 5000L
 private const val NODE_CONFIG_ENV_PROPERTY = "mint.config.location"
 
 enum class ActionTag { LISTENING, DUMP, RESULT, ERROR, RESTART, COMMIT }
@@ -43,14 +47,19 @@ class DistributedTestSystem {
     private val sysLock = ReentrantLock()
     private val sysCond = sysLock.newCondition()
 
-    private val listening = BooleanArray(Configuration.nProcesses + 1)
-    private val dump = arrayOfNulls<StateMachine<MemorySegment>>(Configuration.nProcesses + 1)
-    private val commit = arrayOfNulls<Command?>(Configuration.nProcesses + 1)
-    private val restart = BooleanArray(Configuration.nProcesses + 1)
+    private val listening = BooleanArray(Configuration.nProcesses)
+    private val dump = arrayOfNulls<StateMachine<MemorySegment>>(Configuration.nProcesses)
+    private val commit = arrayOfNulls<Command?>(Configuration.nProcesses)
+    private val restart = BooleanArray(Configuration.nProcesses)
     private val results = ArrayDeque<SystemCommandResult>()
 
+    private val executor = Executors.newFixedThreadPool(
+        Configuration.nProcesses,
+        ThreadFactoryBuilder().setNameFormat("node-%d").build()
+    )
+
     init {
-        log.info("Starting $Configuration.nProcesses processes")
+        log.info("Starting ${Configuration.nProcesses} processes")
         for (node in 0 until Configuration.nProcesses) startProcess(node)
         Runtime.getRuntime().addShutdownHook(Thread {
             for (proc in procs.values) proc.stop()
@@ -59,16 +68,29 @@ class DistributedTestSystem {
 
     private fun startProcess(node: Int) {
         if (procs.containsKey(node)) return // already active
-        System.setProperty(NODE_CONFIG_ENV_PROPERTY, Configuration.nodes[node])
-        val injector = Guice.createInjector(
-            Modules.override(InjectionModule()).with(IntegrationTestInjectionModule(this, node))
-        )
-        val grpcServer = injector.getInstance(Server::class.java)
-        grpcServer.start()
-        procs[node] = NodeProcess(
-            node,
-            NodeGrpcClient("http://localhost:808$node"), grpcServer, injector, this
-        )
+        executor.execute {
+            val injector = Guice.createInjector(
+                Modules.override(InjectionModule()).with(IntegrationTestInjectionModule(this, node))
+            )
+            val grpcServer: Server
+            synchronized(this) {
+                System.setProperty(NODE_CONFIG_ENV_PROPERTY, Configuration.nodes[node])
+                val conf = injector.getInstance(NodeConfig::class.java)
+                conf.setHeartbeatRandom(false)
+                conf.heartbeatTimeoutMs = 1000
+
+                grpcServer = injector.getInstance(Server::class.java)
+                grpcServer.start()
+            }
+            procs[node] = NodeProcess(
+                node,
+                NodeGrpcClient("localhost:808$node"),
+                grpcServer,
+                injector,
+                this
+            )
+            this.onAction(node, LISTENING)
+        }
     }
 
 
@@ -82,6 +104,7 @@ class DistributedTestSystem {
 
     fun reqExit() {
         log.info("Requesting stop for all nodes")
+        executor.shutdownNow()
         reqAll { it.stop() }
     }
 
@@ -96,13 +119,15 @@ class DistributedTestSystem {
     private fun <T> await(
         condition: () -> Boolean,
         action: () -> T,
-        message: String
+        message: String,
+        awaitTimeout: Long? = null
     ): T = sysLock.withLock {
-        val deadline = System.currentTimeMillis() + AWAIT_TIMEOUT_MS
+        val deadline = System.currentTimeMillis() + (awaitTimeout ?: AWAIT_TIMEOUT_MS)
         while (!condition()) {
             checkNotFailed()
             val now = System.currentTimeMillis()
-            if (now >= deadline) error("Test timed out waiting for $message")
+            if (now >= deadline)
+                error("Test timed out waiting for $message")
             sysCond.await(deadline - now, TimeUnit.MILLISECONDS)
         }
         action()
@@ -111,7 +136,8 @@ class DistributedTestSystem {
     fun awaitListening() = await(
         condition = { listening.drop(1).all { it } },
         action = { listening.fill(false) },
-        message = "listening"
+        message = "listening",
+        awaitTimeout = 10_000
     )
 
     fun awaitDump(id: Int) = await(
@@ -129,7 +155,8 @@ class DistributedTestSystem {
     fun awaitClientCommandResult(): SystemCommandResult = await(
         condition = { results.isNotEmpty() },
         action = { results.removeFirst() },
-        message = "client command result"
+        message = "client command result",
+        awaitTimeout = 100_000
     )
 
     fun awaitRestart(id: Int) = await(
@@ -145,7 +172,7 @@ class DistributedTestSystem {
         command: Command? = null,
         commandResult: CommandResult? = null,
         stateMachine: StateMachine<*>? = null
-    ) {
+    ) = sysLock.withLock {
         when (actionTag) {
             LISTENING -> {
                 listening[id] = true
@@ -171,6 +198,7 @@ class DistributedTestSystem {
                 restart[id] = true
                 sysCond.signalAll()
             }
+
             ERROR -> error("Process $id reports error")
         }
     }

@@ -130,7 +130,7 @@ class MockTest(
 
     private val nodeConfig: NodeConfig = Mockito.mock(NodeConfig::class.java).apply {
         Mockito.`when`(this.nodeId).thenReturn(raftActorId)
-        Mockito.`when`(this.cluster).thenReturn(List(nraftActores) { "http://localhost:808$it" })
+        Mockito.`when`(this.cluster).thenReturn(List(nraftActores) { "localhost:808$it" })
         Mockito.`when`(this.logDir).thenReturn(tmpLogDir)
     }
 

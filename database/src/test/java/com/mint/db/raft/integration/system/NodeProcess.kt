@@ -1,10 +1,15 @@
 package com.mint.db.raft.integration.system
 
 import com.google.inject.Injector
+import com.google.inject.Key
 import com.google.protobuf.ByteString
 import com.mint.DatabaseServiceOuterClass
+import com.mint.db.grpc.InternalGrpcActor
 import com.mint.db.grpc.server.Server
+import com.mint.db.raft.DaoStateMachine
+import com.mint.db.raft.RaftActor
 import com.mint.db.raft.StateMachine
+import com.mint.db.raft.integration.configuration.annotations.TestStateMachineBean
 import com.mint.db.raft.model.Command
 import com.mint.db.raft.model.GetCommand
 import com.mint.db.raft.model.GetCommandResult
@@ -12,6 +17,7 @@ import com.mint.db.raft.model.InsertCommand
 import com.mint.db.raft.model.InsertCommandResult
 import com.mint.db.util.LogUtil
 import org.slf4j.LoggerFactory
+import java.lang.foreign.MemorySegment
 
 class NodeProcess(
     private val id: Int,
@@ -21,10 +27,6 @@ class NodeProcess(
     private val distributedTestSystem: DistributedTestSystem,
 ) {
     private val log = LoggerFactory.getLogger("""${NodeProcess::class.java.name}_$id""")
-
-    init {
-        distributedTestSystem.onAction(id, ActionTag.LISTENING)
-    }
 
     fun request(command: Command) {
         log.info("out.${id} >> $command")
@@ -82,17 +84,27 @@ class NodeProcess(
     }
 
     fun restart() {
-        grpcServer.stop()
+        grpcServer.forceStop()
         grpcServer.start()
         distributedTestSystem.onAction(id, ActionTag.RESTART)
     }
 
     fun stop() {
-        grpcServer.stop()
+        grpcServer.forceStop()
+        injector.getInstance(RaftActor::class.java).close()
+        injector.getInstance(InternalGrpcActor::class.java).close()
+        nodeGrpcClient.close()
     }
 
+    @Suppress("UNCHECKED_CAST")
     fun dump() {
-        val stateMachine = injector.getInstance(StateMachine::class.java)
+        val stateMachine: StateMachine<MemorySegment> =
+            injector.getInstance(
+                Key.get(
+                    DaoStateMachine::class.java.genericInterfaces[0],
+                    TestStateMachineBean::class.java
+                )
+            ) as StateMachine<MemorySegment>
         distributedTestSystem.onAction(id, ActionTag.DUMP, stateMachine = stateMachine)
     }
 }

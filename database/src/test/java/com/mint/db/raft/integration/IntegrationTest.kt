@@ -7,11 +7,12 @@ import com.mint.db.raft.integration.system.DistributedTestSystem
 import com.mint.db.raft.mock.nextCommand
 import com.mint.db.raft.model.CommandResult
 import com.mint.db.raft.model.InsertCommand
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
+import java.io.File
 import kotlin.random.Random
 import kotlin.random.nextInt
-import kotlin.test.AfterTest
-import kotlin.test.BeforeTest
-import kotlin.test.Test
 import kotlin.test.assertEquals
 
 
@@ -20,36 +21,38 @@ class IntegrationTest {
     private val nProcesses = Configuration.nodes.size
     private val rnd = Random(1)
     private val expectedMachine = DaoStateMachine(BaseDao())
-    private var lastCommandId = 100
 
-    @BeforeTest
+    @BeforeEach
     fun setup() {
         sys.awaitListening()
     }
 
-    @AfterTest
+    @AfterEach
     fun tearDown() {
         sys.reqExit()
         sys.checkNotFailed()
+        for (i in 0..Configuration.nProcesses) {
+            File("db_$i").deleteRecursively()
+        }
     }
 
     private fun checkDumpsAtTheEnd() {
         sys.checkNotFailed()
         // execute a command to commit all state machines
         val command = InsertCommand(0, "0", "0", false)
-        val expectedResult = expectedMachine.apply(command, 0) // TODO
-        sys.request(1, command)
+        val expectedResult = expectedMachine.apply(command, 0)
+        sys.request(0, command)
         val result = sys.awaitClientCommandResult()
         assertEquals(expectedResult, result.result)
-        // wait until all processes have commited this command
-        for (id in 1..nProcesses) {
+        // wait until all processes have committed this command
+        for (id in 0 until nProcesses) {
             do {
                 val lastCommitted = sys.awaitCommit(id)
             } while (lastCommitted != command)
         }
         // now check dumps
         sys.reqAll { it.dump() }
-        for (id in 1..nProcesses) {
+        for (id in 0 until nProcesses) {
             val machine = sys.awaitDump(id)
             assertEquals(expectedMachine, machine, "State machine of process $id")
         }
@@ -83,7 +86,7 @@ class IntegrationTest {
     }
 
     private fun performRandomCommandsAndAwait(nCommands: Int) {
-        val expectedProcessId = rnd.nextInt(1..nProcesses)
+        val expectedProcessId = rnd.nextInt(0 until nProcesses)
         val commands = List(nCommands) {
             rnd.nextCommand(expectedProcessId)
         }

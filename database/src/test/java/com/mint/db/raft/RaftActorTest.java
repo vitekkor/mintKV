@@ -44,11 +44,11 @@ class RaftActorTest {
                 logDir.toString(),
                 5000L,
                 List.of(
-                        "http://localhost:8080",
-                        "http://localhost:8081",
-                        "http://localhost:8082",
-                        "http://localhost:8083",
-                        "http://localhost:8084"
+                        "localhost:8080",
+                        "localhost:8081",
+                        "localhost:8082",
+                        "localhost:8083",
+                        "localhost:8084"
                 )
         );
 
