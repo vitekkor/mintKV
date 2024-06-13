@@ -13,8 +13,8 @@ import java.util.function.BiConsumer;
 public class CallbackKeeper {
     private static final Logger logger = LoggerFactory.getLogger(CallbackKeeper.class);
 
-    private final Map<Command, ConcurrentLinkedQueue<BiConsumer<Command, CommandResult>>> commandBiConsumerConcurrentHashMap
-            = new ConcurrentHashMap<>();
+    private final Map<Command, ConcurrentLinkedQueue<BiConsumer<Command, CommandResult>>>
+            commandBiConsumerConcurrentHashMap = new ConcurrentHashMap<>();
 
     public void addClientCommandCallback(Command command, BiConsumer<Command, CommandResult> callback) {
         logger.info("Add callback on command {}", command);

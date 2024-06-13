@@ -62,12 +62,19 @@ public class InternalGrpcActor implements InternalGrpcActorInterface, Closeable 
             Raft.AppendEntriesRequest appendEntriesRequest,
             BiConsumer<Integer, Raft.AppendEntriesResponse> onAppendEntryResult
     ) {
-        logger.debug("Send appendEntriesRequest to all cluster {}", LogUtil.protobufMessageToString(appendEntriesRequest));
+        logger.debug(
+                "Send appendEntriesRequest to all cluster {}",
+                LogUtil.protobufMessageToString(appendEntriesRequest)
+        );
         for (Map.Entry<Integer, InternalGrpcClient> entry : internalGrpcClients.entrySet()) {
             int nodeId = entry.getKey();
             InternalGrpcClient client = entry.getValue();
             client.appendEntries(appendEntriesRequest, response -> {
-                logger.debug("AppendEntriesResponse from node {}: {}", nodeId, LogUtil.protobufMessageToString(response));
+                logger.debug(
+                        "AppendEntriesResponse from node {}: {}",
+                        nodeId,
+                        LogUtil.protobufMessageToString(response)
+                );
                 onAppendEntryResult.accept(nodeId, response);
             });
         }
@@ -83,7 +90,11 @@ public class InternalGrpcActor implements InternalGrpcActorInterface, Closeable 
 
         if (client != null) {
             client.appendEntries(appendEntriesRequest, response -> {
-                logger.debug("AppendEntriesResponse from node {}: {}", destId, LogUtil.protobufMessageToString(response));
+                logger.debug(
+                        "AppendEntriesResponse from node {}: {}",
+                        destId,
+                        LogUtil.protobufMessageToString(response)
+                );
                 onAppendEntryResult.accept(destId, response);
             });
         } else {
@@ -219,7 +230,7 @@ public class InternalGrpcActor implements InternalGrpcActorInterface, Closeable 
     @Override
     public void close() throws IOException {
         List<Exception> exceptions = new ArrayList<>();
-        internalGrpcClients.forEach((_, client) -> {
+        internalGrpcClients.forEach((id, client) -> {
             try {
                 client.close();
             } catch (IOException e) {

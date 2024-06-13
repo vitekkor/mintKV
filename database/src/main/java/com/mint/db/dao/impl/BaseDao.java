@@ -42,8 +42,12 @@ public class BaseDao implements Dao<MemorySegment, Entry<MemorySegment>> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof BaseDao baseDao)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof BaseDao baseDao)) {
+            return false;
+        }
 
         return delegate.equals(baseDao.delegate);
     }

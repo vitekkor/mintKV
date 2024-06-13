@@ -115,8 +115,12 @@ public class DaoStateMachine implements StateMachine<MemorySegment> {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof DaoStateMachine that)) return false;
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof DaoStateMachine that)) {
+            return false;
+        }
 
         return dao.equals(that.dao);
     }
