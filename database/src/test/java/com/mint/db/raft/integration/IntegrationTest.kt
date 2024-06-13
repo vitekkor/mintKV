@@ -21,6 +21,7 @@ class IntegrationTest {
     private val nProcesses = Configuration.nodes.size
     private val rnd = Random(1)
     private val expectedMachine = DaoStateMachine(BaseDao())
+    private var lastCommandId = 100
 
     @BeforeEach
     fun setup() {
@@ -77,7 +78,7 @@ class IntegrationTest {
         repeat(50) {
             // usually restart one process, but sometimes a random number
             val nRestarts = if (rnd.nextInt(4) == 0) rnd.nextInt(0..nProcesses) else 1
-            val pids = (1..nProcesses).shuffled(rnd).take(nRestarts)
+            val pids = (0 until nProcesses).shuffled(rnd).take(nRestarts)
             for (pid in pids) sys.restartNode(pid)
             for (pid in pids) sys.awaitRestart(pid)
             performRandomCommandsAndAwait(rnd.nextInt(1..3))
@@ -88,7 +89,7 @@ class IntegrationTest {
     private fun performRandomCommandsAndAwait(nCommands: Int) {
         val expectedProcessId = rnd.nextInt(0 until nProcesses)
         val commands = List(nCommands) {
-            rnd.nextCommand(expectedProcessId)
+            rnd.nextCommand(expectedProcessId, ++lastCommandId)
         }
         val expectedResults: MutableList<CommandResult> = commands.map { expectedMachine.apply(it, 0) }.toMutableList()
         for (command in commands) {

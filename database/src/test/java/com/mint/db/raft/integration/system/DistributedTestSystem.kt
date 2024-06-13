@@ -4,8 +4,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder
 import com.google.inject.Guice
 import com.google.inject.util.Modules
 import com.mint.db.config.InjectionModule
-import com.mint.db.config.NodeConfig
 import com.mint.db.grpc.server.Server
+import com.mint.db.http.server.CallbackKeeper
 import com.mint.db.raft.StateMachine
 import com.mint.db.raft.integration.configuration.Configuration
 import com.mint.db.raft.integration.configuration.IntegrationTestInjectionModule
@@ -20,10 +20,13 @@ import com.mint.db.raft.model.CommandResult
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.lang.foreign.MemorySegment
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
+import java.util.function.BiConsumer
 import kotlin.concurrent.withLock
 
 
@@ -66,18 +69,15 @@ class DistributedTestSystem {
         })
     }
 
-    private fun startProcess(node: Int) {
-        if (procs.containsKey(node)) return // already active
-        executor.execute {
+    private fun startProcess(node: Int, restart: Boolean = false): Future<*> {
+        if (procs.containsKey(node)) return CompletableFuture.completedFuture(null) // already active
+        return executor.submit {
             val injector = Guice.createInjector(
                 Modules.override(InjectionModule()).with(IntegrationTestInjectionModule(this, node))
             )
             val grpcServer: Server
             synchronized(this) {
                 System.setProperty(NODE_CONFIG_ENV_PROPERTY, Configuration.nodes[node])
-                val conf = injector.getInstance(NodeConfig::class.java)
-                conf.setHeartbeatRandom(false)
-                conf.heartbeatTimeoutMs = 1000
 
                 grpcServer = injector.getInstance(Server::class.java)
                 grpcServer.start()
@@ -89,7 +89,7 @@ class DistributedTestSystem {
                 injector,
                 this
             )
-            this.onAction(node, LISTENING)
+            this.onAction(node, if (restart) RESTART else LISTENING)
         }
     }
 
@@ -156,7 +156,7 @@ class DistributedTestSystem {
         condition = { results.isNotEmpty() },
         action = { results.removeFirst() },
         message = "client command result",
-        awaitTimeout = 100_000
+        awaitTimeout = 20_000
     )
 
     fun awaitRestart(id: Int) = await(
@@ -203,7 +203,21 @@ class DistributedTestSystem {
         }
     }
 
+    @Suppress("UNCHECKED_CAST")
     fun restartNode(pid: Int) {
-        procById(pid)?.restart()
+        var callBacks: Map<Command, BiConsumer<Command, CommandResult>>? = null
+        procs.remove(pid)?.apply {
+            stop()
+            val callbackKeeper = injector.getInstance(CallbackKeeper::class.java)
+            callBacks = callbackKeeper::class.java.getDeclaredField("commandBiConsumerConcurrentHashMap").let {
+                it.isAccessible = true
+                it.get(callbackKeeper) as Map<Command, BiConsumer<Command, CommandResult>>
+            }
+        }
+        startProcess(pid, true).get()
+        val callbackKeeper = procById(pid)?.injector?.getInstance(CallbackKeeper::class.java)
+        if (callbackKeeper != null && callBacks != null) {
+            callBacks!!.forEach(callbackKeeper::addClientCommandCallback)
+        }
     }
 }

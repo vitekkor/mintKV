@@ -4,6 +4,9 @@ import com.google.inject.Injector
 import com.google.inject.Key
 import com.google.protobuf.ByteString
 import com.mint.DatabaseServiceOuterClass
+import com.mint.db.dao.Dao
+import com.mint.db.dao.impl.BaseDao
+import com.mint.db.dao.impl.BaseEntry
 import com.mint.db.grpc.InternalGrpcActor
 import com.mint.db.grpc.server.Server
 import com.mint.db.raft.DaoStateMachine
@@ -23,7 +26,7 @@ class NodeProcess(
     private val id: Int,
     private val nodeGrpcClient: NodeGrpcClient,
     private val grpcServer: Server,
-    private val injector: Injector,
+    val injector: Injector,
     private val distributedTestSystem: DistributedTestSystem,
 ) {
     private val log = LoggerFactory.getLogger("""${NodeProcess::class.java.name}_$id""")
@@ -81,12 +84,6 @@ class NodeProcess(
                 }
             }
         }
-    }
-
-    fun restart() {
-        grpcServer.forceStop()
-        grpcServer.start()
-        distributedTestSystem.onAction(id, ActionTag.RESTART)
     }
 
     fun stop() {

@@ -33,6 +33,9 @@ fun Random.nextMemorySegment(): MemorySegment = StringDaoWrapper.toMemorySegment
 fun Random.nextCommand(processId: Int, uncommitted: Boolean = false) =
     InsertCommand(processId, nextString(), nextString(), uncommitted)
 
+fun Random.nextCommand(processId: Int, id: Int, uncommitted: Boolean = false) =
+    InsertCommand(processId, "${id}_${nextString()}", "${id}_${nextString()}", uncommitted)
+
 fun Random.nextCommandResult(term: Long) = InsertCommandResult(term, nextString())
 
 fun Random.nextLogEntry(index: Long, term: Long, env: Environment<*>) =
