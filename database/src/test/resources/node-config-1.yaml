@@ -1,5 +1,6 @@
 port: 8081
+httpPort: 8091
 nodeId: 1
-heartbeatTimeoutMs: 5000
+heartbeatTimeoutMs: 4000
 cluster: ["localhost:8080", "localhost:8081", "localhost:8082", "localhost:8083", "localhost:8084"]
 logDir: "db_1"

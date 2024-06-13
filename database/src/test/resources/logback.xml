@@ -13,4 +13,6 @@
     </root>
 
     <logger name="com.mint" level="DEBUG" additivity="true"/>
+    <logger name="io.grpc.netty" level="INFO" additivity="true"/>
+    <logger name="io.netty" level="INFO" additivity="true"/>
 </configuration>

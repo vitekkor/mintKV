@@ -1,5 +1,6 @@
 port: 8083
+httpPort: 8093
 nodeId: 3
-heartbeatTimeoutMs: 5000
+heartbeatTimeoutMs: 4000
 cluster: ["localhost:8080", "localhost:8081", "localhost:8082", "localhost:8083", "localhost:8084"]
 logDir: "db_3"
