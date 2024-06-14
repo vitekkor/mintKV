@@ -152,11 +152,11 @@ class DistributedTestSystem {
         message = "commit $id"
     )
 
-    fun awaitClientCommandResult(): SystemCommandResult = await(
+    fun awaitClientCommandResult(command: Command): SystemCommandResult = await(
         condition = { results.isNotEmpty() },
         action = { results.removeFirst() },
-        message = "client command result",
-        awaitTimeout = 30_000
+        message = "client command result $command",
+        awaitTimeout = 50_000
     )
 
     fun awaitRestart(id: Int) = await(

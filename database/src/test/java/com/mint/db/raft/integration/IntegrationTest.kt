@@ -43,7 +43,7 @@ class IntegrationTest {
         val command = InsertCommand(0, "0", "0", false)
         val expectedResult = expectedMachine.apply(command, 0)
         sys.request(0, command)
-        val result = sys.awaitClientCommandResult()
+        val result = sys.awaitClientCommandResult(command)
         assertEquals(expectedResult, result.result)
         // wait until all processes have committed this command
         for (id in 0 until nProcesses) {
@@ -96,7 +96,7 @@ class IntegrationTest {
             sys.request(command.processId, command)
         }
         while (expectedResults.isNotEmpty()) {
-            val (processId, result) = sys.awaitClientCommandResult()
+            val (processId, result) = sys.awaitClientCommandResult(commands.first())
             assertEquals(expectedProcessId, processId)
             val expectedResult = expectedResults.find { it == result }
             assertEquals(expectedResult, result)
