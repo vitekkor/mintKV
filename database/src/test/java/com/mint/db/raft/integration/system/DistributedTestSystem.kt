@@ -84,7 +84,7 @@ class DistributedTestSystem {
             }
             procs[node] = NodeProcess(
                 node,
-                NodeGrpcClient("localhost:808$node"),
+                NodeGrpcClient("localhost:818$node"),
                 grpcServer,
                 injector,
                 this
