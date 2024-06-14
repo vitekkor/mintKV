@@ -1,7 +1,7 @@
-port: 8080
+port: 8180
 httpPort: 8090
 nodeId: 0
 heartbeatTimeoutMs: 500
 heartbeatRandom: false
-cluster: ["localhost:8080", "localhost:8081", "localhost:8082", "localhost:8083", "localhost:8084"]
+cluster: ["localhost:8180", "localhost:8181", "localhost:8182", "localhost:8183", "localhost:8184"]
 logDir: "db_0"
