@@ -41,7 +41,7 @@ public class InternalGrpcClient implements Closeable {
             TsiFrameProtector.Consumer<Raft.ClientCommandResponseRPC> onRequestResult
     ) {
         logger.debug("Get request {}", LogUtil.protobufMessageToString(commandRequestRPC));
-        stub.clientCommand(commandRequestRPC, new StreamObserver<>() {
+        Context.current().fork().run(() -> stub.clientCommand(commandRequestRPC, new StreamObserver<>() {
 
             @Override
             public void onNext(Raft.ClientCommandResponseRPC clientCommandResponseRPC) {
@@ -57,7 +57,7 @@ public class InternalGrpcClient implements Closeable {
             public void onCompleted() {
                 logger.debug("Get request completed");
             }
-        });
+        }));
     }
 
     public void insert(

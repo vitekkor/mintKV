@@ -565,11 +565,7 @@ public class RaftActor implements RaftActorInterface {
         int leaderId = srcId;
         if (commandResult.term() > state.currentTerm()) {
             logger.debug("Command result with newest term received. Became a follower");
-            if (command.processId() == nodeId) {
-                callbackKeeper.onClientCommandResult(command, commandResult);
-            } else {
-                internalGrpcActor.onClientCommandResult(command, commandResult);
-            }
+            sendCommandResult(command, commandResult);
             env.replicatedLogManager().writePersistentState(new PersistentState(commandResult.term()));
             this.leaderId = leaderId;
             startTimeout(Timeout.ELECTION_TIMEOUT);
@@ -578,11 +574,7 @@ public class RaftActor implements RaftActorInterface {
                 internalGrpcActor.sendClientCommand(leaderId, command, this::onClientCommandResult);
             }
         } else {
-            if (command.processId() == nodeId) {
-                callbackKeeper.onClientCommandResult(command, commandResult);
-            } else {
-                internalGrpcActor.onClientCommandResult(command, commandResult);
-            }
+            sendCommandResult(command, commandResult);
         }
         MDC.remove(MDC_NODE_ID);
     }
@@ -619,7 +611,7 @@ public class RaftActor implements RaftActorInterface {
             if (isClusterReadyToAcceptEntries(logEntry)) {
                 sendAppendEntriesRequest(state, logEntry, lastLogId);
             }
-            callbackKeeper.onClientCommandResult(command, commandResult);
+            sendCommandResult(command, commandResult);
         } else if (isClusterReadyToAcceptEntries(logEntry)) {
             sendAppendEntriesRequest(state, logEntry, lastLogId);
         }
@@ -646,10 +638,18 @@ public class RaftActor implements RaftActorInterface {
 
             case READ_LOCAL, READ_COMMITTED -> {
                 CommandResult commandResult = env.stateMachine().apply(command, state.currentTerm());
-                callbackKeeper.onClientCommandResult(command, commandResult);
+                sendCommandResult(command, commandResult);
             }
 
             default -> throw new IllegalArgumentException("UNRECOGNIZED readMode");
+        }
+    }
+
+    private void sendCommandResult(Command command, CommandResult commandResult) {
+        if (command.processId() == nodeId) {
+            callbackKeeper.onClientCommandResult(command, commandResult);
+        } else {
+            internalGrpcActor.onClientCommandResult(command, commandResult);
         }
     }
 

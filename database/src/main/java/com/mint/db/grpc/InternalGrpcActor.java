@@ -12,6 +12,7 @@ import com.mint.db.raft.model.InsertCommand;
 import com.mint.db.raft.model.InsertCommandResult;
 import com.mint.db.util.ClientCommandResultConsumer;
 import com.mint.db.util.LogUtil;
+import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 import jakarta.inject.Inject;
 import org.slf4j.Logger;
@@ -196,12 +197,9 @@ public class InternalGrpcActor implements InternalGrpcActorInterface, Closeable 
     @Override
     public void addClientCommandCallback(Command command, StreamObserver<?> responseObserver) {
         logger.debug("Add callback to command {}", command);
-        commandStreamObserverMap.compute(command, (k, v) -> {
-            ConcurrentLinkedQueue<StreamObserver<?>> queue =
-                    (v == null) ? new ConcurrentLinkedQueue<>() : v;
-            queue.add(responseObserver);
-            return queue;
-        });
+        commandStreamObserverMap.computeIfAbsent(
+                command, (k) -> new ConcurrentLinkedQueue<>()
+        ).add(responseObserver);
     }
 
     @Override

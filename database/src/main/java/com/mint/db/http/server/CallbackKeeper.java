@@ -18,16 +18,16 @@ public class CallbackKeeper {
 
     public void addClientCommandCallback(Command command, BiConsumer<Command, CommandResult> callback) {
         logger.info("Add callback on command {}", command);
-        commandBiConsumerConcurrentHashMap.compute(command, (k, v) -> {
-            ConcurrentLinkedQueue<BiConsumer<Command, CommandResult>> queue =
-                    (v == null) ? new ConcurrentLinkedQueue<>() : v;
-            queue.add(callback);
-            return queue;
-        });
+        commandBiConsumerConcurrentHashMap.computeIfAbsent(
+                command, (k) -> new ConcurrentLinkedQueue<>()
+        ).add(callback);
     }
 
     public void onClientCommandResult(Command command, CommandResult commandResult) {
         logger.info("Callback on command {} with result {}", command, commandResult);
+        if (!commandBiConsumerConcurrentHashMap.containsKey(command)) {
+            logger.warn("Callback on command {} is empty", command);
+        }
         commandBiConsumerConcurrentHashMap.computeIfPresent(command, (k, queue) -> {
             BiConsumer<Command, CommandResult> callback = queue.poll();
             if (callback != null) {

@@ -89,6 +89,11 @@ class DistributedTestSystem {
                 injector,
                 this
             )
+            var sleep = 1000L
+            if (restart) {
+                sleep = 2000
+            }
+            Thread.sleep(sleep)
             this.onAction(node, if (restart) RESTART else LISTENING)
         }
     }

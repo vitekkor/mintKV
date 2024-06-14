@@ -8,9 +8,9 @@
         </layout>
     </appender>
 
-    <root level="INFO">
+    <root level="DEBUG">
         <appender-ref ref="CONSOLE"/>
     </root>
 
-    <logger name="com.mint" level="INFO" additivity="true"/>
+    <logger name="com.mint" level="DEBUG" additivity="true"/>
 </configuration>

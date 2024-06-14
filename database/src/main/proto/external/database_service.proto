@@ -20,12 +20,12 @@ message DeleteRequest {
 }
 
 message GetRequest {
-  bytes key = 1;
+  string key = 1;
   ReadMode mode = 2;
 }
 
 message GetResponse {
-  bytes value = 1;
+  string value = 1;
   bool found = 2;
 }
 

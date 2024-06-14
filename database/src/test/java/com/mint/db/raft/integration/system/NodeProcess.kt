@@ -67,7 +67,7 @@ class NodeProcess(
 
             is GetCommand -> {
                 val request = DatabaseServiceOuterClass.GetRequest.newBuilder()
-                    .setKey(ByteString.copyFromUtf8(command.key))
+                    .setKey(command.key)
                     .setMode(command.readMode)
                     .build()
                 nodeGrpcClient.get(request) {
@@ -78,7 +78,7 @@ class NodeProcess(
                         commandResult = GetCommandResult(
                             0, // FIXME
                             command.key,
-                            if (it.found) it.value.toStringUtf8() else null
+                            if (it.found) it.value else null
                         )
                     )
                 }
