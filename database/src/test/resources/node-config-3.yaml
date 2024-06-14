@@ -1,0 +1,7 @@
+port: 8183
+httpPort: 8093
+nodeId: 3
+heartbeatTimeoutMs: 500
+heartbeatRandom: false
+cluster: ["localhost:8180", "localhost:8181", "localhost:8182", "localhost:8183", "localhost:8184"]
+logDir: "db_3"

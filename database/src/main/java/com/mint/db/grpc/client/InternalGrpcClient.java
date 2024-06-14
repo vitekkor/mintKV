@@ -3,6 +3,7 @@ package com.mint.db.grpc.client;
 import com.mint.db.Raft;
 import com.mint.db.RaftServiceGrpc;
 import com.mint.db.util.LogUtil;
+import io.grpc.Context;
 import io.grpc.Grpc;
 import io.grpc.InsecureChannelCredentials;
 import io.grpc.ManagedChannel;
@@ -40,7 +41,7 @@ public class InternalGrpcClient implements Closeable {
             TsiFrameProtector.Consumer<Raft.ClientCommandResponseRPC> onRequestResult
     ) {
         logger.debug("Get request {}", LogUtil.protobufMessageToString(commandRequestRPC));
-        stub.clientCommand(commandRequestRPC, new StreamObserver<>() {
+        Context.current().fork().run(() -> stub.clientCommand(commandRequestRPC, new StreamObserver<>() {
 
             @Override
             public void onNext(Raft.ClientCommandResponseRPC clientCommandResponseRPC) {
@@ -56,7 +57,7 @@ public class InternalGrpcClient implements Closeable {
             public void onCompleted() {
                 logger.debug("Get request completed");
             }
-        });
+        }));
     }
 
     public void insert(
@@ -64,7 +65,7 @@ public class InternalGrpcClient implements Closeable {
             TsiFrameProtector.Consumer<Raft.ClientCommandResponseRPC> onInsertResult
     ) {
         logger.debug("Insert request {}", LogUtil.protobufMessageToString(commandRequestRPC));
-        stub.clientCommand(commandRequestRPC, new StreamObserver<>() {
+        Context.current().fork().run(() -> stub.clientCommand(commandRequestRPC, new StreamObserver<>() {
             @Override
             public void onNext(Raft.ClientCommandResponseRPC clientCommandResponseRPC) {
                 onInsertResult.accept(clientCommandResponseRPC);
@@ -79,7 +80,7 @@ public class InternalGrpcClient implements Closeable {
             public void onCompleted() {
                 logger.debug("Insert request completed");
             }
-        });
+        }));
     }
 
     public void delete(
@@ -87,7 +88,7 @@ public class InternalGrpcClient implements Closeable {
             TsiFrameProtector.Consumer<Raft.ClientCommandResponseRPC> onDeleteResult
     ) {
         logger.debug("Delete request {}", LogUtil.protobufMessageToString(commandRequestRPC));
-        stub.clientCommand(commandRequestRPC, new StreamObserver<>() {
+        Context.current().fork().run(() -> stub.clientCommand(commandRequestRPC, new StreamObserver<>() {
             @Override
             public void onNext(Raft.ClientCommandResponseRPC clientCommandResponseRPC) {
                 onDeleteResult.accept(clientCommandResponseRPC);
@@ -102,7 +103,7 @@ public class InternalGrpcClient implements Closeable {
             public void onCompleted() {
                 logger.debug("Delete request completed");
             }
-        });
+        }));
     }
 
     public void requestVote(
@@ -110,7 +111,7 @@ public class InternalGrpcClient implements Closeable {
             TsiFrameProtector.Consumer<Raft.VoteResponse> onRequestVoteResult
     ) {
         logger.debug("RequestVote request {}", LogUtil.protobufMessageToString(voteRequest));
-        stub.requestVote(voteRequest, new StreamObserver<>() {
+        Context.current().fork().run(() -> stub.requestVote(voteRequest, new StreamObserver<>() {
             @Override
             public void onNext(Raft.VoteResponse response) {
                 onRequestVoteResult.accept(response);
@@ -125,7 +126,7 @@ public class InternalGrpcClient implements Closeable {
             public void onCompleted() {
                 logger.debug("RequestVote completed");
             }
-        });
+        }));
     }
 
     public void appendEntries(
@@ -133,7 +134,7 @@ public class InternalGrpcClient implements Closeable {
             TsiFrameProtector.Consumer<Raft.AppendEntriesResponse> onAppendEntriesResult
     ) {
         logger.debug("AppendEntries request {}", LogUtil.protobufMessageToString(appendEntriesRequest));
-        stub.appendEntries(appendEntriesRequest, new StreamObserver<>() {
+        Context.current().fork().run(() -> stub.appendEntries(appendEntriesRequest, new StreamObserver<>() {
             @Override
             public void onNext(Raft.AppendEntriesResponse response) {
                 onAppendEntriesResult.accept(response);
@@ -148,13 +149,14 @@ public class InternalGrpcClient implements Closeable {
             public void onCompleted() {
                 logger.debug("AppendEntries completed");
             }
-        });
+        }));
     }
 
     @Override
     public void close() throws IOException {
         try {
             channel.shutdown().awaitTermination(5, TimeUnit.SECONDS);
+            channel.shutdownNow();
             executor.shutdown();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

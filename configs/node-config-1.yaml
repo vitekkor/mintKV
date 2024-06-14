@@ -2,5 +2,5 @@ port: 8086
 httpPort: 8092
 nodeId: 1
 heartbeatTimeoutMs: 5000
-cluster: ["localhost:8080", "localhost:8081", "localhost:8082"]
+cluster: ["localhost:8085", "localhost:8086", "localhost:8087"]
 logDir: "db_1"

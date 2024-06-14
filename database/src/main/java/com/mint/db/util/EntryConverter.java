@@ -20,6 +20,7 @@ public final class EntryConverter {
         return Raft.LogEntry.newBuilder()
                 .setTerm(logEntry.logId().term())
                 .setIndex(logEntry.logId().index())
+                .setProcessId(logEntry.processId())
                 .setKey(key)
                 .setValue(value)
                 .setOperation(operation)

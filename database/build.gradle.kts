@@ -5,6 +5,7 @@ plugins {
     `java-configuration`
     id("com.google.protobuf") version "0.9.4"
     kotlin("jvm")
+    jacoco
 }
 
 repositories {
@@ -32,7 +33,6 @@ dependencies {
     testImplementation("org.powermock:powermock-module-junit4:2.0.9")
     testImplementation("org.powermock:powermock-api-mockito2:2.0.9")
     testImplementation("org.awaitility:awaitility:4.2.1")
-    implementation(kotlin("stdlib-jdk8"))
     testImplementation(kotlin("test-junit"))
 }
 
@@ -71,9 +71,28 @@ sourceSets {
 }
 
 tasks {
+    jacocoTestReport {
+        classDirectories.setFrom(
+            files(classDirectories.files.map {
+                fileTree(it) {
+                    exclude(
+                        "com/example/excluded/**",
+                        "com/mint/db/Raft*.class",
+                        "com/mint/db/DatabaseServiceOuterClass*.class",
+                        "com/mint/db/exceptions/ServerStartupException*.class",
+                        "com/mint/db/replication/ReplicatedLogManager.class",
+                        "com/mint/db/replication/model/PersistentState*.class",
+                        "com/mint/db/dao/Dao*.class",
+                        "com/mint/db/dao/Entry*.class"
+                    )
+                }
+            })
+        )
+    }
     test {
         testLogging.showStandardStreams = true
-        filter { excludeTestsMatching("*MockTest*") }
+        filter { excludeTestsMatching("*MockTest*").excludeTestsMatching("*IntegrationTest*") }
+        finalizedBy(jacocoTestReport)
     }
 
     val mockTest by registering(Test::class) {
@@ -81,14 +100,24 @@ tasks {
         testLogging.showStandardStreams = true
         filter { includeTestsMatching("*MockTest*") }
         allJvmArgs = allJvmArgs.toMutableList().apply { add("--enable-preview") }
+        finalizedBy(jacocoTestReport)
+    }
+
+    val integrationTest by registering(Test::class) {
+        group = "verification"
+        testLogging.showStandardStreams = true
+        filter { includeTestsMatching("*IntegrationTest*") }
+        allJvmArgs = allJvmArgs.toMutableList().apply { add("--enable-preview") }
+        useJUnitPlatform()
+        finalizedBy(jacocoTestReport)
     }
 
     check {
         dependsOn(mockTest)
+        dependsOn(integrationTest)
     }
 }
 
 kotlin {
     jvmToolchain(21)
 }
-

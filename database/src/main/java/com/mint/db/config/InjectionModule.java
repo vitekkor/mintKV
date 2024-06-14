@@ -39,6 +39,7 @@ import java.util.Map;
 public class InjectionModule extends AbstractModule {
     @Provides
     @PersistentStateBean
+    @Singleton
     static PersistentState provicePersistentState() {
         // TODO READ FROM FILE
         return new PersistentState();
@@ -46,18 +47,21 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @CallbackKeeperBean
+    @Singleton
     static CallbackKeeper provideCallbackKeeper() {
         return new CallbackKeeper();
     }
 
     @Provides
     @NodeConfiguration
+    @Singleton
     static NodeConfig proviceNodeConfig() throws FileNotFoundException {
         return ConfigParser.parseConfig();
     }
 
     @Provides
     @InternalGrpcActorBean
+    @Singleton
     static InternalGrpcActorInterface provideInternalGrpcActorInterface(
             @InternalClientsBean Map<Integer, InternalGrpcClient> internalGrpcClients
     ) {
@@ -66,6 +70,7 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @ExternalGrpcActorBean
+    @Singleton
     static ExternalServiceImpl provideExternalGrpcActorInterface(
             @NodeConfiguration NodeConfig nodeConfig,
             @RaftActorBean RaftActor raftActor,
@@ -76,12 +81,14 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @DaoBean
+    @Singleton
     static Dao<MemorySegment, Entry<MemorySegment>> provideDao() {
         return new BaseDao();
     }
 
     @Provides
     @StateMachineBean
+    @Singleton
     static StateMachine<MemorySegment> provideStateMachine(
             @DaoBean Dao<MemorySegment, Entry<MemorySegment>> dao
     ) {
@@ -90,6 +97,7 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @ReplicatedLogManagerBean
+    @Singleton
     static ReplicatedLogManager<MemorySegment> provideReplicatedLogManager(
             @NodeConfiguration NodeConfig nodeConfig,
             @PersistentStateBean PersistentState persistentState,
@@ -100,6 +108,7 @@ public class InjectionModule extends AbstractModule {
 
     @Provides
     @EnvironmentBean
+    @Singleton
     static Environment<MemorySegment> provideEnvironment(
             @NodeConfiguration NodeConfig nodeConfig,
             @ReplicatedLogManagerBean ReplicatedLogManager<MemorySegment> replicatedLogManager,

@@ -52,11 +52,11 @@ public class DaoStateMachine implements StateMachine<MemorySegment> {
                 MemorySegment committedValue = operationType == OperationType.PUT ? value : null;
 
                 if (committed) {
-                    dao.upsert(new BaseEntry<>(key, committedValue, null, false));
+                    dao.upsert(new BaseEntry(key, committedValue, null, false));
                 } else {
                     Entry<MemorySegment> oldEntry = dao.get(key);
                     MemorySegment oldValue = oldEntry != null ? oldEntry.committedValue() : null;
-                    dao.upsert(new BaseEntry<>(key, oldValue, committedValue, true));
+                    dao.upsert(new BaseEntry(key, oldValue, committedValue, true));
                 }
 
                 commandResult = new InsertCommandResult(logEntry.logId().term(), toString(key));
@@ -97,9 +97,9 @@ public class DaoStateMachine implements StateMachine<MemorySegment> {
                 if (insertCommand.uncommitted()) {
                     Entry<MemorySegment> oldEntry = dao.get(key);
                     MemorySegment oldValue = oldEntry != null ? oldEntry.committedValue() : null;
-                    dao.upsert(new BaseEntry<>(key, oldValue, committedValue, true));
+                    dao.upsert(new BaseEntry(key, oldValue, committedValue, true));
                 } else {
-                    dao.upsert(new BaseEntry<>(key, committedValue, null, false));
+                    dao.upsert(new BaseEntry(key, committedValue, null, false));
                 }
 
                 return new InsertCommandResult(currentTerm, toString(key));
@@ -111,5 +111,22 @@ public class DaoStateMachine implements StateMachine<MemorySegment> {
     public static String toString(MemorySegment memorySegment) {
         return memorySegment == null ? null :
                 new String(memorySegment.toArray(ValueLayout.JAVA_BYTE), StandardCharsets.UTF_8);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof DaoStateMachine that)) {
+            return false;
+        }
+
+        return dao.equals(that.dao);
+    }
+
+    @Override
+    public int hashCode() {
+        return dao.hashCode();
     }
 }

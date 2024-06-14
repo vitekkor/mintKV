@@ -53,8 +53,8 @@ public class InternalServiceImpl extends RaftServiceGrpc.RaftServiceImplBase {
             StreamObserver<Raft.ClientCommandResponseRPC> responseObserver
     ) {
         var command = clientCommandRequestRPCToCommand(request);
-        raftActor.onClientCommand(command);
         internalGrpcActor.addClientCommandCallback(command, responseObserver);
+        raftActor.onClientCommand(command);
         //onCompleted will be called by the callback mechanism when the command is fully processed
     }
 

@@ -16,6 +16,7 @@ import com.mint.db.raft.model.GetCommand;
 import com.mint.db.raft.model.GetCommandResult;
 import com.mint.db.raft.model.InsertCommand;
 import com.mint.db.raft.model.InsertCommandResult;
+import io.grpc.Context;
 import io.grpc.stub.StreamObserver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,7 +85,7 @@ public class ExternalServiceImpl
             DatabaseServiceOuterClass.GetResponse response;
             if (commandResult.value() != null) {
                 response = DatabaseServiceOuterClass.GetResponse.newBuilder()
-                        .setValue(ByteString.copyFromUtf8(commandResult.value()))
+                        .setValue(commandResult.value())
                         .setFound(true)
                         .build();
             } else {
@@ -127,14 +128,15 @@ public class ExternalServiceImpl
         logger.debug("Converting GetRequest to Command: {}", request);
         return new GetCommand(
                 nodeConfig.getNodeId(),
-                request.getKey().toStringUtf8(),
+                request.getKey(),
                 request.getMode()
         );
     }
 
     private void addClientCommandCallback(Command command, StreamObserver<?> responseObserver) {
-        callbackKeeper.addClientCommandCallback(command, (c, r) -> {
-            onClientCommandResult(c, r, responseObserver);
-        });
+        var currentContext = Context.current();
+        callbackKeeper.addClientCommandCallback(command, (c, r) ->
+                currentContext.run(() -> onClientCommandResult(c, r, responseObserver))
+        );
     }
 }

@@ -43,3 +43,4 @@ bin/
 /.idea/
 /database/logs/
 /*.log
+/database/db_*/

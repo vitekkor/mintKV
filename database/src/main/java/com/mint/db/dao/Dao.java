@@ -12,4 +12,6 @@ public interface Dao<D, E extends Entry<D>> {
     default Iterator<E> all() {
         return get(null, null);
     }
+
+    void remove(E entry);
 }

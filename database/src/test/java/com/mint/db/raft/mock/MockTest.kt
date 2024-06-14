@@ -130,7 +130,7 @@ class MockTest(
 
     private val nodeConfig: NodeConfig = Mockito.mock(NodeConfig::class.java).apply {
         Mockito.`when`(this.nodeId).thenReturn(raftActorId)
-        Mockito.`when`(this.cluster).thenReturn(List(nraftActores) { "http://localhost:808$it" })
+        Mockito.`when`(this.cluster).thenReturn(List(nraftActores) { "localhost:808$it" })
         Mockito.`when`(this.logDir).thenReturn(tmpLogDir)
     }
 
@@ -425,7 +425,7 @@ class MockTest(
     fun `FOLLOWER reports command result`() {
         val leaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores
         val result = rnd.nextCommandResult(term)
-        raftActor.onClientCommandResult(leaderId, null, result)
+        raftActor.onClientCommandResult(leaderId, result.toDummyCommand(raftActorId), result)
         expectActions(
             Result(result)
         )
@@ -575,7 +575,7 @@ class MockTest(
         val oldLeaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
         initCandidate()
         val result = rnd.nextCommandResult(oldTerm)
-        raftActor.onClientCommandResult(oldLeaderId, null, result)
+        raftActor.onClientCommandResult(oldLeaderId, result.toDummyCommand(raftActorId), result)
         expectActions(
             Result(result)
         )
@@ -850,7 +850,7 @@ class MockTest(
         val oldLeaderId = (raftActorId + rnd.nextInt(nraftActores - 1)) % nraftActores + 1
         initLeader()
         val result = rnd.nextCommandResult(oldTerm)
-        raftActor.onClientCommandResult(oldLeaderId, null, result)
+        raftActor.onClientCommandResult(oldLeaderId, result.toDummyCommand(raftActorId), result)
         expectActions(
             Result(result)
         )

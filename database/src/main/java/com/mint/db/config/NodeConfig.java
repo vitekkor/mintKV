@@ -9,8 +9,9 @@ public final class NodeConfig {
     private String logDir;
     private long heartbeatTimeoutMs;
     private List<String> cluster;
+    private boolean heartbeatRandom = true;
 
-    private NodeConfig() {
+    public NodeConfig() {
 
     }
 
@@ -82,7 +83,11 @@ public final class NodeConfig {
         return heartbeatTimeoutMs;
     }
 
+    public void setHeartbeatRandom(boolean heartbeatRandom) {
+        this.heartbeatRandom = heartbeatRandom;
+    }
+
     public boolean heartbeatRandom() {
-        return true;
+        return heartbeatRandom;
     }
 }
