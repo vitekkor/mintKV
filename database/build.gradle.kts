@@ -5,6 +5,7 @@ plugins {
     `java-configuration`
     id("com.google.protobuf") version "0.9.4"
     kotlin("jvm")
+    jacoco
 }
 
 repositories {
@@ -72,7 +73,19 @@ sourceSets {
 tasks {
     test {
         testLogging.showStandardStreams = true
-        filter { excludeTestsMatching("*MockTest*") }
+        filter { excludeTestsMatching("*MockTest*").excludeTestsMatching("*IntegrationTest*") }
+        finalizedBy(jacocoTestReport)
+        configure<JacocoTaskExtension> {
+            excludes = listOf(
+                "com.mint.db.Raft.class",
+                "com.mint.db.DatabaseServiceOuterClass.class",
+                "com.mint.db.exceptions.ServerStartupException.class",
+                "com.mint.db.replication.ReplicatedLogManager.class",
+                "com.mint.db.replication.model.PersistentState.class",
+                "com.mint.db.dao.Dao.class",
+                "com.mint.db.dao.Entry.class"
+            )
+        }
     }
 
     val mockTest by registering(Test::class) {
@@ -80,6 +93,18 @@ tasks {
         testLogging.showStandardStreams = true
         filter { includeTestsMatching("*MockTest*") }
         allJvmArgs = allJvmArgs.toMutableList().apply { add("--enable-preview") }
+        finalizedBy(jacocoTestReport)
+        configure<JacocoTaskExtension> {
+            excludes = listOf(
+                "com.mint.db.Raft.class",
+                "com.mint.db.DatabaseServiceOuterClass.class",
+                "com.mint.db.exceptions.ServerStartupException.class",
+                "com.mint.db.replication.ReplicatedLogManager.class",
+                "com.mint.db.replication.model.PersistentState.class",
+                "com.mint.db.dao.Dao.class",
+                "com.mint.db.dao.Entry.class"
+            )
+        }
     }
 
     val integrationTest by registering(Test::class) {
@@ -88,6 +113,18 @@ tasks {
         filter { includeTestsMatching("*IntegrationTest*") }
         allJvmArgs = allJvmArgs.toMutableList().apply { add("--enable-preview") }
         useJUnitPlatform()
+        finalizedBy(jacocoTestReport)
+        configure<JacocoTaskExtension> {
+            excludes = listOf(
+                "com.mint.db.Raft.class",
+                "com.mint.db.DatabaseServiceOuterClass.class",
+                "com.mint.db.exceptions.ServerStartupException.class",
+                "com.mint.db.replication.ReplicatedLogManager.class",
+                "com.mint.db.replication.model.PersistentState.class",
+                "com.mint.db.dao.Dao.class",
+                "com.mint.db.dao.Entry.class"
+            )
+        }
     }
 
     check {

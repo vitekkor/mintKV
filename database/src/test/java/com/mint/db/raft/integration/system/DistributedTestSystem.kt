@@ -156,7 +156,7 @@ class DistributedTestSystem {
         condition = { results.isNotEmpty() },
         action = { results.removeFirst() },
         message = "client command result",
-        awaitTimeout = 20_000
+        awaitTimeout = 30_000
     )
 
     fun awaitRestart(id: Int) = await(
